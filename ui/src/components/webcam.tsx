@@ -28,6 +28,12 @@ export function Webcam({ onStreamReady }: WebcamProps) {
             width: { exact: 512 },
             height: { exact: 512 },
           },
+          audio: {
+            noiseSuppression: true,
+            echoCancellation: true,
+            sampleRate: 16000,
+            sampleSize: 16,
+          },
         });
 
         if (videoRef.current) videoRef.current.srcObject = stream;

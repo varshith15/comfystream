@@ -29,9 +29,9 @@ def convert_prompt(prompt: PromptDictInput) -> Prompt:
                 "class_type": "SaveTensor",
                 "_meta": {"title": "SaveTensor"},
             }
-        elif node.get("class_type") == "LoadTensor":
+        elif node.get("class_type") in ["LoadTensor", "LoadAudioTensor"]:
             num_inputs += 1
-        elif node.get("class_type") == "SaveTensor":
+        elif node.get("class_type") in ["SaveTensor", "SaveASRResponse"]:
             num_outputs += 1
 
     # Only handle single input for now

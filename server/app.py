@@ -190,7 +190,7 @@ async def offer(request):
 
     pcs.add(pc)
 
-    tracks = {"video": None}
+    tracks = {"video": None, "audio": None}
 
     # Prefer h264
     transceiver = pc.addTransceiver("video")

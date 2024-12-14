@@ -4,6 +4,7 @@ class SaveASRResponse:
     CATEGORY = "audio_utils"
     RETURN_TYPES = ()
     FUNCTION = "execute"
+    OUTPUT_NODE = True
 
     @classmethod
     def INPUT_TYPES(s):

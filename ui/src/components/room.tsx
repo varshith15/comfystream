@@ -78,6 +78,7 @@ export function Room() {
     streamUrl: "",
     frameRate: 0,
     selectedDeviceId: "",
+    selectedAudioDeviceId: "", // New property for audio device
     prompt: null,
   });
 
@@ -153,6 +154,7 @@ export function Room() {
                   onStreamReady={onStreamReady}
                   deviceId={config.selectedDeviceId}
                   frameRate={config.frameRate}
+                  selectedAudioDeviceId={config.selectedAudioDeviceId} // Pass audio device ID
                 />
               </div>
             </div>

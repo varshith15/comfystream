@@ -1,7 +1,7 @@
 from comfystream import tensor_cache
 
 class LoadAudioTensor:
-    CATEGORY = "tensor_utils"
+    CATEGORY = "audio_utils"
     RETURN_TYPES = ("AUDIO",)
     FUNCTION = "execute"
 

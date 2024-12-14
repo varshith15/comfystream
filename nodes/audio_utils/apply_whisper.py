@@ -11,6 +11,7 @@ class ApplyWhisper:
             }
         }
 
+    CATEGORY = "audio_utils"
     RETURN_TYPES = ("DICT",)
     FUNCTION = "apply_whisper"
 
@@ -33,23 +34,23 @@ class ApplyWhisper:
         concatenated_audio = torch.cat(self.audio_buffer, dim=0).cuda()
         self.audio_buffer = []
         result = self.model.transcribe(concatenated_audio.float(), fp16=True, word_timestamps=True)
-        segments = result['segments']
+        segments = result["segments"]
         segments_alignment = []
         words_alignment = []
 
         for segment in segments:
             segment_dict = {
-                'value': segment['text'].strip(),
-                'start': segment['start'],
-                'end': segment['end']
+                "value": segment["text"].strip(),
+                "start": segment["start"],
+                "end": segment["end"]
             }
             segments_alignment.append(segment_dict)
 
             for word in segment["words"]:
                 word_dict = {
-                    'value': word["word"].strip(),
-                    'start': word["start"],
-                    'end': word['end']
+                    "value": word["word"].strip(),
+                    "start": word["start"],
+                    "end": word["end"]
                 }
                 words_alignment.append(word_dict)
 

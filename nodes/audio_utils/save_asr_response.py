@@ -1,10 +1,9 @@
 from comfystream import tensor_cache
 
 class SaveASRResponse:
-    CATEGORY = "tensor_utils"
+    CATEGORY = "audio_utils"
     RETURN_TYPES = ()
     FUNCTION = "execute"
-    OUTPUT_NODE = True
 
     @classmethod
     def INPUT_TYPES(s):

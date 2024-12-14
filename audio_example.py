@@ -13,7 +13,7 @@ async def main():
 
     client.set_prompt(prompt)
 
-    waveform, _ = torchaudio.load("harvard.wav")
+    waveform, _ = torchaudio.load("/home/user/harvard.wav")
     if waveform.ndim > 1:
         audio_tensor = waveform.mean(dim=0)
 

@@ -25,7 +25,7 @@ function MediaStreamPlayer({ stream }: MediaStreamPlayerProps) {
       ref={videoRef}
       autoPlay
       playsInline
-      muted
+      // muted
       className="w-full h-full"
     />
   );
@@ -52,7 +52,7 @@ function Stage({ connected, onStreamReady }: StageProps) {
           className="w-full h-full object-cover"
           autoPlay
           loop
-          muted
+          // muted
           playsInline
         >
           <source src="/loading.mp4" type="video/mp4" />

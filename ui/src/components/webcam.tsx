@@ -18,14 +18,21 @@ function StreamCanvas({
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
+    if (!stream) return;
+
     const canvas = canvasRef.current!;
-    const outputStream = canvas.captureStream(30);
-    onStreamReady(outputStream);
+    const videoOnlyStream = canvas.captureStream(frameRate);
+    const audioTracks = stream.getAudioTracks();
+    const combinedStream = new MediaStream([
+      ...videoOnlyStream.getVideoTracks(),
+      ...audioTracks,
+    ]);
+    onStreamReady(combinedStream);
 
     return () => {
-      outputStream.getTracks().forEach((track) => track.stop());
+      combinedStream.getTracks().forEach((track) => track.stop());
     };
-  }, [onStreamReady, frameRate]);
+  }, [stream, frameRate, onStreamReady]);
 
   // Set up canvas animation loop
   useEffect(() => {

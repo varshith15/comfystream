@@ -59,7 +59,7 @@ class AudioStreamTrack(MediaStreamTrack):
 
     async def recv(self):
         frame = await self.track.recv()
-        return await self.pipeline(frame)
+        return frame
 
     # async def recv(self):
     #     frame = await self.source.recv()

@@ -76,7 +76,7 @@ function StreamCanvas({
     if (!stream) return;
     if (!videoRef.current) {
       videoRef.current = document.createElement("video");
-      // videoRef.current.muted = true;
+      videoRef.current.muted = true;
     }
 
     const video = videoRef.current;

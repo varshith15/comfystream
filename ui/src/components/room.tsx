@@ -79,7 +79,8 @@ export function Room() {
     frameRate: 0,
     selectedDeviceId: "",
     selectedAudioDeviceId: "", // New property for audio device
-    prompt: null,
+    videoPrompt: null,
+    audioPrompt: null,
   });
 
   const connectingRef = useRef(false);
@@ -135,7 +136,8 @@ export function Room() {
       <div className="fixed inset-0 z-[-1] bg-cover bg-[black]">
         <PeerConnector
           url={config.streamUrl}
-          prompt={config.prompt}
+          videoPrompt={config.videoPrompt}
+          audioPrompt={config.audioPrompt}
           connect={connect}
           onConnected={handleConnected}
           onDisconnected={handleDisconnected}

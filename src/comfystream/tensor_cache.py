@@ -2,5 +2,8 @@ import asyncio
 import torch
 from typing import List
 
-inputs: List[torch.Tensor] = []
-outputs: List[asyncio.Future] = []
+image_inputs: List[torch.Tensor] = []
+image_outputs: List[asyncio.Future] = []
+
+audio_inputs: List[torch.Tensor] = []
+audio_outputs: List[asyncio.Future] = []

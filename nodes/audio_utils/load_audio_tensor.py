@@ -14,5 +14,5 @@ class LoadAudioTensor:
         return float("nan")
 
     def execute(self):
-        audio = tensor_cache.inputs.pop()
+        audio = tensor_cache.audio_inputs.pop()
         return (audio,)

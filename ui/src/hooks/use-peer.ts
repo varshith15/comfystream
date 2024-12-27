@@ -6,7 +6,7 @@ const MAX_OFFER_RETRIES = 5;
 const OFFER_RETRY_INTERVAL = 500;
 
 export function usePeer(props: PeerProps): Peer {
-  const { url, prompt, connect, onConnected, onDisconnected, localStream } =
+  const { url, videoPrompt, audioPrompt, connect, onConnected, onDisconnected, localStream } =
     props;
 
   const [peerConnection, setPeerConnection] =
@@ -33,7 +33,8 @@ export function usePeer(props: PeerProps): Peer {
         },
         body: JSON.stringify({
           endpoint: url,
-          prompt,
+          video_prompt: videoPrompt,
+          audio_prompt: audioPrompt,
           offer,
         }),
       });

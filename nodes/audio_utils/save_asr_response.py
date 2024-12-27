@@ -19,6 +19,6 @@ class SaveASRResponse:
         return float("nan")
 
     def execute(self, data: dict):
-        fut = tensor_cache.outputs.pop()
+        fut = tensor_cache.audio_outputs.pop()
         fut.set_result(data)
         return data

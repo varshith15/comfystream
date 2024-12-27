@@ -149,9 +149,9 @@ export function Webcam({ onStreamReady, deviceId, frameRate, selectedAudioDevice
         },
         audio: {
           ...(selectedAudioDeviceId ? { deviceId: { exact: selectedAudioDeviceId } } : {}),
-          sampleRate: 16000,
-          sampleSize: 16,
-          channelCount: 1,
+          sampleRate: { ideal: 16000 },
+          sampleSize: { ideal: 16 },
+          channelCount: { exact: 1 },
         },
       });
       return newStream;

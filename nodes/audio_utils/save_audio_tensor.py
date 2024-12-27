@@ -1,10 +1,8 @@
-import torch
-
 from comfystream import tensor_cache
 
 
-class SaveTensor:
-    CATEGORY = "tensor_utils"
+class SaveAudioTensor:
+    CATEGORY = "audio_utils"
     RETURN_TYPES = ()
     FUNCTION = "execute"
     OUTPUT_NODE = True
@@ -13,7 +11,7 @@ class SaveTensor:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "images": ("IMAGE",),
+                "audio": ("AUDIO",),
             }
         }
 
@@ -21,7 +19,7 @@ class SaveTensor:
     def IS_CHANGED(s):
         return float("nan")
 
-    def execute(self, images: torch.Tensor):
-        fut = tensor_cache.image_outputs.pop()
-        fut.set_result(images)
-        return images
+    def execute(self, audio):
+        fut = tensor_cache.audio_outputs.pop()
+        fut.set_result(audio)
+        return audio

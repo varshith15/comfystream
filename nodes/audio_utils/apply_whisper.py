@@ -21,17 +21,18 @@ class ApplyWhisper:
         # TO:DO to get them as params
         self.sample_rate = 16000
         self.min_duration = 1.0
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
     def apply_whisper(self, audio, model):
         if self.model is None:
-            self.model = whisper.load_model(model).cuda()
+            self.model = whisper.load_model(model).to(self.device)
 
         self.audio_buffer.append(audio)
         total_duration = sum(chunk.shape[0] / self.sample_rate for chunk in self.audio_buffer)
         if total_duration < self.min_duration:
             return {"text": "", "segments_alignment": [], "words_alignment": []}
 
-        concatenated_audio = torch.cat(self.audio_buffer, dim=0).cuda()
+        concatenated_audio = torch.cat(self.audio_buffer, dim=0).to(self.device)
         self.audio_buffer = []
         result = self.model.transcribe(concatenated_audio.float(), fp16=True, word_timestamps=True)
         segments = result["segments"]

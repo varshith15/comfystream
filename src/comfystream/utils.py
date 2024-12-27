@@ -48,7 +48,7 @@ def convert_prompt(prompt: PromptDictInput) -> Prompt:
             num_primary_inputs += 1
         elif class_type in ["LoadImage", "LoadTensor", "LoadAudioTensor"]:
             num_inputs += 1
-        elif class_type in ["PreviewImage", "SaveImage", "SaveTensor", "SaveASRResponse"]:
+        elif class_type in ["PreviewImage", "SaveImage", "SaveTensor", "SaveASRResponse", "SaveAudioTensor"]:
             num_outputs += 1
 
     # Only handle single primary input

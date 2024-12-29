@@ -21,14 +21,14 @@
   },
   "3": {
     "inputs": {
-      "data": [
+      "result": [
         "2",
         0
       ]
     },
-    "class_type": "SaveASRResponse",
+    "class_type": "SaveResult",
     "_meta": {
-      "title": "Save ASR Response"
+      "title": "Save Result"
     }
   }
 }

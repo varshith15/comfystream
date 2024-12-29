@@ -1,6 +1,6 @@
 from comfystream import tensor_cache
 
-class SaveASRResponse:
+class SaveResult:
     CATEGORY = "audio_utils"
     RETURN_TYPES = ()
     FUNCTION = "execute"
@@ -10,7 +10,7 @@ class SaveASRResponse:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "data": ("DICT",),
+                "result": ("RESULT",),
             }
         }
 
@@ -18,7 +18,7 @@ class SaveASRResponse:
     def IS_CHANGED(s):
         return float("nan")
 
-    def execute(self, data: dict):
+    def execute(self, result):
         fut = tensor_cache.audio_outputs.pop()
-        fut.set_result(data)
-        return data
+        fut.set_result(result)
+        return result

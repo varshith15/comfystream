@@ -1,3 +1,5 @@
+# TODO: move it to a seperate repo
+
 from .whisper_online import FasterWhisperASR, VACOnlineASRProcessor
 
 class ApplyWhisper:

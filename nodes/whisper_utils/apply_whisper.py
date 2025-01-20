@@ -1,5 +1,5 @@
-# TODO: move it to a seperate repo
-
+import librosa
+import numpy as np
 from .whisper_online import FasterWhisperASR, VACOnlineASRProcessor
 
 class ApplyWhisper:
@@ -12,7 +12,7 @@ class ApplyWhisper:
         }
 
     CATEGORY = "whisper_utils"
-    RETURN_TYPES = ("RESULT",)
+    RETURN_TYPES = ("TEXT",)
     FUNCTION = "apply_whisper"
 
     def __init__(self):
@@ -34,6 +34,7 @@ class ApplyWhisper:
         )
         
     def apply_whisper(self, audio):
+        audio = librosa.resample(audio.astype(np.float32), 48000, 16000)
         self.online.insert_audio_chunk(audio)
-        result = self.online.process_iter()
-        return (result,)
+        text = self.online.process_iter()
+        return (text,)

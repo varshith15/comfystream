@@ -26,27 +26,51 @@ MIN_BITRATE = 2000000
 
 class VideoStreamTrack(MediaStreamTrack):
     kind = "video"
-
     def __init__(self, track: MediaStreamTrack, pipeline):
         super().__init__()
         self.track = track
         self.pipeline = pipeline
+        self.processed_frames = asyncio.Queue()
+        asyncio.create_task(self.collect_frames())
+
+    async def collect_frames(self):
+        while True:
+            frame = await self.track.recv()
+            processed = await self.pipeline(frame)
+            await self.processed_frames.put(processed)
 
     async def recv(self):
-        frame = await self.track.recv()
-        return await self.pipeline(frame)
+        return await self.processed_frames.get()
     
+
 class AudioStreamTrack(MediaStreamTrack):
     kind = "audio"
-
     def __init__(self, track: MediaStreamTrack, pipeline):
         super().__init__()
         self.track = track
         self.pipeline = pipeline
+        self.incoming_frames = asyncio.Queue()
+        self.processed_frames = asyncio.Queue()
+        asyncio.create_task(self.collect_frames())
+        asyncio.create_task(self.process_frames())
+        self.started = False
+
+    async def collect_frames(self):
+        while True:
+            frame = await self.track.recv()
+            await self.incoming_frames.put(frame)
+
+    async def process_frames(self):
+        while True:
+            frames = []
+            while len(frames) < 25:
+                frames.append(await self.incoming_frames.get())
+            processed_frames = await self.pipeline(frames)
+            for processed_frame in processed_frames:
+                await self.processed_frames.put(processed_frame)
 
     async def recv(self):
-        frame = await self.track.recv()
-        return await self.pipeline(frame)
+        return await self.processed_frames.get()
 
 
 def force_codec(pc, sender, forced_codec):
@@ -95,9 +119,6 @@ async def offer(request):
     pcs = request.app["pcs"]
 
     params = await request.json()
-
-    print("VIDEO PROMPT", params["video_prompt"])
-    print("AUDIO PROMPT", params["audio_prompt"])
 
     video_pipeline.set_prompt(params["video_prompt"])
     await video_pipeline.warm()

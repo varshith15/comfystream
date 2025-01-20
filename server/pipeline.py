@@ -1,15 +1,14 @@
 import torch
 import av
 import numpy as np
+import fractions
 
-from typing import Any, Dict, Optional, Union
+from av import AudioFrame
+from typing import Any, Dict, Optional, Union, List
 from comfystream.client import ComfyStreamClient
 
 WARMUP_RUNS = 5
-
-# TODO: remove, was just for temp UI
 import logging
-
 display_logger = logging.getLogger('display_logger')
 display_logger.setLevel(logging.INFO)
 handler = logging.FileHandler('display_logs.txt')
@@ -57,46 +56,47 @@ class VideoPipeline:
 class AudioPipeline:
     def __init__(self, **kwargs):
         self.client = ComfyStreamClient(**kwargs, type="audio")
-        self.resampler = av.audio.resampler.AudioResampler(format='s16', layout='mono', rate=16000)
+        self.resampler = av.audio.resampler.AudioResampler(format='s16', layout='mono', rate=48000)
+        self.sample_rate = 48000
+        self.frame_size = int(self.sample_rate * 0.02)
+        self.time_base = fractions.Fraction(1, self.sample_rate)
+        self.curr_pts = 0
 
     async def warm(self):
-        dummy_audio = torch.randn(16000)
+        dummy_audio = np.random.randint(-32768, 32767, 48000 * 1, dtype=np.int16)
         for _ in range(WARMUP_RUNS):
             await self.predict(dummy_audio)
 
     def set_prompt(self, prompt: Dict[Any, Any]):
         self.client.set_prompt(prompt)
 
-    def preprocess(self, frame: av.AudioFrame) -> torch.Tensor:
-        resampled_frame = self.resampler.resample(frame)[0]
-        samples = resampled_frame.to_ndarray()
-        samples = samples.astype(np.float32) / 32768.0
-        return samples
+    def preprocess(self, frames: List[av.AudioFrame]) -> torch.Tensor:
+        audio_arrays = []
+        for frame in frames:
+            audio_arrays.append(self.resampler.resample(frame)[0].to_ndarray())
+        return np.concatenate(audio_arrays, axis=1).flatten()
 
-    def postprocess(self, output: torch.Tensor) -> Optional[Union[av.AudioFrame, str]]:
-        out_np = output.cpu().numpy()
-        out_np = np.clip(out_np * 32768.0, -32768, 32767).astype(np.int16)
-        audio_frame = av.AudioFrame.from_ndarray(out_np, format="s16", layout="stereo")
-        return audio_frame
+    def postprocess(self, out_np) -> Optional[Union[av.AudioFrame, str]]:
+        frames = []
+        for idx in range(0, len(out_np), self.frame_size):
+            frame_samples = out_np[idx:idx + self.frame_size]
+            frame_samples = frame_samples.reshape(1, -1)
+            frame = AudioFrame.from_ndarray(frame_samples, layout="mono")
+            frame.sample_rate = self.sample_rate
+            frame.pts = self.curr_pts
+            frame.time_base = self.time_base
+            self.curr_pts += 960
+
+            frames.append(frame)
+        return frames
         
-    async def predict(self, frame: torch.Tensor) -> torch.Tensor:
+    async def predict(self, frame) -> torch.Tensor:
         return await self.client.queue_prompt(frame)
 
-    async def __call__(self, frame: av.AudioFrame):
-        # TODO: clean this up later for audio-to-text and audio-to-audio
-        pre_output = self.preprocess(frame)
-        pred_output = await self.predict(pre_output)
-        if type(pred_output) == tuple:
-            if pred_output[0] is not None:
-                await self.log_text(f"{pred_output[0]} {pred_output[1]} {pred_output[2]}")
-            return frame
-        else:
-            post_output = self.postprocess(pred_output)
-            post_output.sample_rate = frame.sample_rate
-            post_output.pts = frame.pts
-            post_output.time_base = frame.time_base
-            return post_output
-
-    async def log_text(self, text: str):
-        # TODO: remove, was just for temp UI
-        display_logger.info(text)
+    async def __call__(self, frames: List[av.AudioFrame]):
+        pre_audio = self.preprocess(frames)
+        pred_audio, text = await self.predict(pre_audio)
+        if text[-1] != "":
+            display_logger.info(f"{text[0]} {text[1]} {text[2]}")
+        pred_audios = self.postprocess(pred_audio)
+        return pred_audios

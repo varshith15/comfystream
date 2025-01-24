@@ -15,7 +15,7 @@ from aiortc import (
 )
 from aiortc.rtcrtpsender import RTCRtpSender
 from aiortc.codecs import h264
-from pipeline import VideoPipeline, AudioPipeline
+from pipeline import Pipeline
 from utils import patch_loop_datagram
 
 logger = logging.getLogger(__name__)
@@ -30,17 +30,15 @@ class VideoStreamTrack(MediaStreamTrack):
         super().__init__()
         self.track = track
         self.pipeline = pipeline
-        self.processed_frames = asyncio.Queue()
         asyncio.create_task(self.collect_frames())
 
     async def collect_frames(self):
         while True:
             frame = await self.track.recv()
-            processed = await self.pipeline(frame)
-            await self.processed_frames.put(processed)
+            await self.pipeline.put_video_frame(frame)
 
     async def recv(self):
-        return await self.processed_frames.get()
+        return await self.pipeline.get_processed_video_frame()
     
 
 class AudioStreamTrack(MediaStreamTrack):
@@ -49,28 +47,15 @@ class AudioStreamTrack(MediaStreamTrack):
         super().__init__()
         self.track = track
         self.pipeline = pipeline
-        self.incoming_frames = asyncio.Queue()
-        self.processed_frames = asyncio.Queue()
         asyncio.create_task(self.collect_frames())
-        asyncio.create_task(self.process_frames())
-        self.started = False
 
     async def collect_frames(self):
         while True:
             frame = await self.track.recv()
-            await self.incoming_frames.put(frame)
-
-    async def process_frames(self):
-        while True:
-            frames = []
-            while len(frames) < 25:
-                frames.append(await self.incoming_frames.get())
-            processed_frames = await self.pipeline(frames)
-            for processed_frame in processed_frames:
-                await self.processed_frames.put(processed_frame)
+            await self.pipeline.put_audio_frame(frame)
 
     async def recv(self):
-        return await self.processed_frames.get()
+        return await self.pipeline.get_processed_audio_frame()
 
 
 def force_codec(pc, sender, forced_codec):
@@ -114,16 +99,13 @@ def get_ice_servers():
 
 
 async def offer(request):
-    video_pipeline = request.app["video_pipeline"]
-    audio_pipeline = request.app["audio_pipeline"]
+    pipeline = request.app["pipeline"]
     pcs = request.app["pcs"]
 
     params = await request.json()
 
-    video_pipeline.set_prompt(params["video_prompt"])
-    await video_pipeline.warm()
-    audio_pipeline.set_prompt(params["audio_prompt"])
-    await audio_pipeline.warm()
+    pipeline.set_prompts(params["video_prompt"])
+    await pipeline.warm()
 
     offer_params = params["offer"]
     offer = RTCSessionDescription(sdp=offer_params["sdp"], type=offer_params["type"])
@@ -154,14 +136,14 @@ async def offer(request):
     def on_track(track):
         logger.info(f"Track received: {track.kind}")
         if track.kind == "video":
-            videoTrack = VideoStreamTrack(track, video_pipeline)
+            videoTrack = VideoStreamTrack(track, pipeline)
             tracks["video"] = videoTrack
             sender = pc.addTrack(videoTrack)
 
             codec = "video/H264"
             force_codec(pc, sender, codec)
         elif track.kind == "audio":
-            audioTrack = AudioStreamTrack(track, audio_pipeline)
+            audioTrack = AudioStreamTrack(track, pipeline)
             tracks["audio"] = audioTrack
             pc.addTrack(audioTrack)
 
@@ -196,7 +178,7 @@ async def set_prompt(request):
     pipeline = request.app["pipeline"]
 
     prompt = await request.json()
-    pipeline.set_prompt(prompt)
+    pipeline.set_prompts(prompt)
 
     return web.Response(content_type="application/json", text="OK")
 
@@ -209,10 +191,7 @@ async def on_startup(app: web.Application):
     if app["media_ports"]:
         patch_loop_datagram(app["media_ports"])
 
-    app["video_pipeline"] = VideoPipeline(
-        cwd=app["workspace"], disable_cuda_malloc=True, gpu_only=True
-    )
-    app["audio_pipeline"] = AudioPipeline(
+    app["pipeline"] = Pipeline(
         cwd=app["workspace"], disable_cuda_malloc=True, gpu_only=True
     )
     app["pcs"] = set()

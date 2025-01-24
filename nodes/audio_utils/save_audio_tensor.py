@@ -12,7 +12,6 @@ class SaveAudioTensor:
         return {
             "required": {
                 "audio": ("AUDIO",),
-                "text": ("TEXT",)
             }
         }
 
@@ -20,7 +19,7 @@ class SaveAudioTensor:
     def IS_CHANGED(s):
         return float("nan")
 
-    def execute(self, audio, text):
-        fut = tensor_cache.audio_outputs.pop()
-        fut.set_result((audio, text))
-        return (audio, text)
+    def execute(self, audio):
+        fut = tensor_cache.audio_outputs.get()
+        fut.set_result((audio))
+        return (audio,)

@@ -110,7 +110,7 @@ interface ConfigFormProps {
 }
 
 function ConfigForm({ config, onSubmit }: ConfigFormProps) {
-  const [prompts, setPrompts] = useState<any>(null);
+  const [prompts, setPrompts] = useState<any[]>([]);
   const [videoDevices, setVideoDevices] = useState<VideoDevice[]>([]);
   const [audioDevices, setAudioDevices] = useState<VideoDevice[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<string>("");
@@ -191,15 +191,20 @@ function ConfigForm({ config, onSubmit }: ConfigFormProps) {
     });
   };
 
-  const handlePromptsChange = async (e: any) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  const handlePromptsChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
 
     try {
-      const text = await file.text();
-      setPrompts(JSON.parse(text));
+      const files = Array.from(e.target.files);
+      const fileReads = files.map(async (file) => {
+        const text = await file.text();
+        return JSON.parse(text);
+      });
+
+      const allPrompts = await Promise.all(fileReads);
+      setPrompts(allPrompts);
     } catch (err) {
-      console.error(err);
+      console.error("Failed to parse one or more JSON files.", err);
     }
   };
 
@@ -274,8 +279,9 @@ function ConfigForm({ config, onSubmit }: ConfigFormProps) {
             id="video-workflow"
             type="file"
             accept=".json"
+            multiple
             onChange={handlePromptsChange}
-          ></Input>
+          />
         </div>
 
         <Button type="submit" className="w-full mt-4 mb-4">

@@ -104,7 +104,7 @@ async def offer(request):
 
     params = await request.json()
 
-    pipeline.set_prompts(params["video_prompt"])
+    pipeline.set_prompts(params["prompts"])
     await pipeline.warm()
 
     offer_params = params["offer"]

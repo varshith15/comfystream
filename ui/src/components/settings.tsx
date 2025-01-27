@@ -31,10 +31,9 @@ import { Select } from "./ui/select";
 export interface StreamConfig {
   streamUrl: string;
   frameRate: number;
-  videoPrompt?: any;
-  audioPrompt?: any;
+  prompts?: any;
   selectedDeviceId: string;
-  selectedAudioDeviceId: string; // New property for audio device
+  selectedAudioDeviceId: string;
 }
 
 interface VideoDevice {
@@ -111,8 +110,7 @@ interface ConfigFormProps {
 }
 
 function ConfigForm({ config, onSubmit }: ConfigFormProps) {
-  const [videoPrompt, setVideoPrompt] = useState<any>(null);
-  const [audioPrompt, setAudioPrompt] = useState<any>(null);
+  const [prompts, setPrompts] = useState<any>(null);
   const [videoDevices, setVideoDevices] = useState<VideoDevice[]>([]);
   const [audioDevices, setAudioDevices] = useState<VideoDevice[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<string>("");
@@ -187,32 +185,19 @@ function ConfigForm({ config, onSubmit }: ConfigFormProps) {
       streamUrl: values.streamUrl
         ? values.streamUrl.replace(/\/+$/, "")
         : values.streamUrl,
-      videoPrompt: videoPrompt,
-      audioPrompt: audioPrompt,
+      prompts: prompts,
       selectedDeviceId: selectedDevice,
       selectedAudioDeviceId: selectedAudioDevice,
     });
   };
 
-  const handleVideoPromptChange = async (e: any) => {
+  const handlePromptsChange = async (e: any) => {
     const file = e.target.files[0];
     if (!file) return;
 
     try {
       const text = await file.text();
-      setVideoPrompt(JSON.parse(text));
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleAudioPromptChange = async (e: any) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    try {
-      const text = await file.text();
-      setAudioPrompt(JSON.parse(text));
+      setPrompts(JSON.parse(text));
     } catch (err) {
       console.error(err);
     }
@@ -284,22 +269,12 @@ function ConfigForm({ config, onSubmit }: ConfigFormProps) {
         </div>
 
         <div className="mt-4 mb-4 grid max-w-sm items-center gap-3">
-          <Label>Comfy Video Workflow</Label>
+          <Label>Comfy Workflows</Label>
           <Input
             id="video-workflow"
             type="file"
             accept=".json"
-            onChange={handleVideoPromptChange}
-          ></Input>
-        </div>
-
-        <div className="mt-4 mb-4 grid max-w-sm items-center gap-3">
-          <Label>Comfy Audio Workflow</Label>
-          <Input
-            id="audio-workflow"
-            type="file"
-            accept=".json"
-            onChange={handleAudioPromptChange}
+            onChange={handlePromptsChange}
           ></Input>
         </div>
 

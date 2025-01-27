@@ -13,7 +13,7 @@ WARMUP_RUNS = 5
 
 class Pipeline:
     def __init__(self, **kwargs):
-        self.client = ComfyStreamClient(**kwargs, max_workers=2)
+        self.client = ComfyStreamClient(**kwargs, max_workers=5) # hardcoded max workers
 
         self.video_futures = asyncio.Queue()
         self.audio_futures = asyncio.Queue()
@@ -21,10 +21,10 @@ class Pipeline:
         self.audio_output_frames = []
         
         self.resampler = av.audio.resampler.AudioResampler(format='s16', layout='mono', rate=48000) # find a better way to convert to mono
-        self.sample_rate = 48000
+        self.sample_rate = 48000 # instead of hardcoding, find a clean way to set from audio frame
         self.frame_size = int(self.sample_rate * 0.02)
         self.time_base = fractions.Fraction(1, self.sample_rate)
-        self.curr_pts = 0
+        self.curr_pts = 0 # figure out a better way to set back pts to processed audio frames
 
     async def warm(self):
         dummy_video_frame = torch.randn(1, 512, 512, 3)
@@ -76,7 +76,6 @@ class Pipeline:
 
     def audio_postprocess(self, output: torch.Tensor) -> av.AudioFrame:
         frames = []
-        print("OUTPUT SHAPE", output.shape)
         for idx in range(0, len(output), self.frame_size):
             frame_samples = output[idx:idx + self.frame_size]
             frame_samples = frame_samples.reshape(1, -1).astype(np.int16)

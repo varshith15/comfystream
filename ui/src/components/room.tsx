@@ -6,7 +6,13 @@ import { Webcam } from "@/components/webcam";
 import { usePeerContext } from "@/context/peer-context";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { ControlPanelsContainer } from "@/components/control-panels-container";
 interface MediaStreamPlayerProps {
   stream: MediaStream;
 }
@@ -37,13 +43,31 @@ interface StageProps {
 }
 
 function Stage({ connected, onStreamReady }: StageProps) {
-  const { remoteStream } = usePeerContext();
+  const { remoteStream, peerConnection } = usePeerContext();
+  const [frameRate, setFrameRate] = useState<number>(0);
 
   useEffect(() => {
     if (!connected || !remoteStream) return;
 
     onStreamReady();
-  }, [connected, remoteStream]);
+
+    const interval = setInterval(() => {
+      if (peerConnection) {
+        peerConnection.getStats().then((stats) => {
+          stats.forEach((report) => {
+            if (report.type === "inbound-rtp" && report.kind === "video") {
+              const currentFrameRate = report.framesPerSecond;
+              if (currentFrameRate) {
+                setFrameRate(Math.round(currentFrameRate));
+              }
+            }
+          });
+        });
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [connected, remoteStream, peerConnection, onStreamReady]);
 
   if (!connected || !remoteStream) {
     return (
@@ -61,7 +85,21 @@ function Stage({ connected, onStreamReady }: StageProps) {
     );
   }
 
-  return <MediaStreamPlayer stream={remoteStream} />;
+  return (
+    <div className="relative w-full h-full">
+      <MediaStreamPlayer stream={remoteStream} />
+      <div className="absolute top-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-sm">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger>{frameRate} FPS</TooltipTrigger>
+            <TooltipContent>
+              <p>This is the FPS of the output stream.</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+    </div>
+  );
 }
 
 export function Room() {
@@ -141,15 +179,24 @@ export function Room() {
           onDisconnected={handleDisconnected}
           localStream={localStream}
         >
-          <div className="min-h-[100dvh] flex flex-col items-center justify-center">
-            <div className="w-full max-h-[100dvh] flex flex-col lg:flex-row landscape:flex-row justify-center items-center lg:space-x-4">
-              <div className="landscape:w-full lg:w-1/2 h-[50dvh] lg:h-auto landscape:h-full max-w-[512px] max-h-[512px] aspect-square bg-[black] flex justify-center items-center lg:border-2 lg:rounded-md">
+          <div className="min-h-[100dvh] flex flex-col items-center justify-start">
+            <div className="w-full max-h-[100dvh] flex flex-col lg:flex-row landscape:flex-row justify-center items-center lg:space-x-4 sm:pt-[10vh]">
+              {/* Output Stream */}
+              <div className="relative w-full max-w-[100vw] h-auto aspect-square sm:max-w-[512px] sm:max-h-[512px] md:max-w-[512px] md:max-h-[512px] flex justify-center items-center bg-slate-900 sm:border-[2px] md:border-0 lg:border-2 rounded-md">
                 <Stage
                   connected={isConnected}
                   onStreamReady={onRemoteStreamReady}
                 />
+                <div className="absolute bottom-[8px] right-[8px] w-[90px] h-[90px] bg-slate-800 block md:hidden">
+                  <Webcam
+                    onStreamReady={onStreamReady}
+                    deviceId={config.selectedDeviceId}
+                    frameRate={config.frameRate}
+                  />
+                </div>
               </div>
-              <div className="landscape:w-full lg:w-1/2 h-[50dvh] lg:h-auto landscape:h-full max-w-[512px] max-h-[512px] aspect-square flex justify-center items-center lg:border-2 lg:rounded-md">
+              {/* Input Stream */}
+              <div className="hidden md:flex w-full sm:w-full md:w-full h-[50dvh] sm:h-auto md:h-auto max-w-[512px] max-h-[512px] aspect-square justify-center items-center lg:border-2 lg:rounded-md bg-slate-800">
                 <Webcam
                   onStreamReady={onStreamReady}
                   deviceId={config.selectedDeviceId}
@@ -158,6 +205,8 @@ export function Room() {
                 />
               </div>
             </div>
+
+            {isConnected && <ControlPanelsContainer />}
 
             <StreamSettings
               open={isStreamSettingsOpen}

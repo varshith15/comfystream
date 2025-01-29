@@ -23,7 +23,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  createContext,
+  useContext,
+} from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Select } from "./ui/select";
@@ -43,7 +49,7 @@ interface VideoDevice {
 
 export const DEFAULT_CONFIG: StreamConfig = {
   streamUrl:
-    process.env.NEXT_PUBLIC_DEFAULT_STREAM_URL || "http://127.0.0.1:3000",
+    process.env.NEXT_PUBLIC_DEFAULT_STREAM_URL || "http://127.0.0.1:8888",
   frameRate: 30,
   selectedDeviceId: "",
   selectedAudioDeviceId: "", // Default value for audio device
@@ -109,8 +115,25 @@ interface ConfigFormProps {
   onSubmit: (config: StreamConfig) => void;
 }
 
+interface PromptContextType {
+  originalPrompt: any;
+  currentPrompt: any;
+  setOriginalPrompt: (prompt: any) => void;
+  setCurrentPrompt: (prompt: any) => void;
+}
+
+export const PromptContext = createContext<PromptContextType>({
+  originalPrompt: null,
+  currentPrompt: null,
+  setOriginalPrompt: () => {},
+  setCurrentPrompt: () => {},
+});
+
+export const usePrompt = () => useContext(PromptContext);
+
 function ConfigForm({ config, onSubmit }: ConfigFormProps) {
   const [prompts, setPrompts] = useState<any[]>([]);
+  const { setOriginalPrompts } = usePrompt();
   const [videoDevices, setVideoDevices] = useState<VideoDevice[]>([]);
   const [audioDevices, setAudioDevices] = useState<VideoDevice[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<string>("");
@@ -203,6 +226,7 @@ function ConfigForm({ config, onSubmit }: ConfigFormProps) {
 
       const allPrompts = await Promise.all(fileReads);
       setPrompts(allPrompts);
+      setOriginalPrompts(allPrompts);
     } catch (err) {
       console.error("Failed to parse one or more JSON files.", err);
     }

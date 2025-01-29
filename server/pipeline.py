@@ -11,6 +11,8 @@ from comfystream import tensor_cache
 
 WARMUP_RUNS = 5
 
+
+
 class Pipeline:
     def __init__(self, **kwargs):
         self.client = ComfyStreamClient(**kwargs, max_workers=5) # hardcoded max workers
@@ -25,6 +27,9 @@ class Pipeline:
         self.frame_size = int(self.sample_rate * 0.02)
         self.time_base = fractions.Fraction(1, self.sample_rate)
         self.curr_pts = 0 # figure out a better way to set back pts to processed audio frames
+
+    def set_prompt(self, prompt: Dict[Any, Any]):
+        self.client.set_prompt(prompt)
 
     async def warm(self):
         dummy_video_frame = torch.randn(1, 512, 512, 3)
@@ -95,7 +100,6 @@ class Pipeline:
         frame.time_base = time_base
         return frame
 
-
     async def get_processed_audio_frame(self):
         while not self.audio_output_frames:
             out_fut = await self.audio_futures.get()
@@ -105,3 +109,8 @@ class Pipeline:
                 continue
             self.audio_output_frames.extend(self.audio_postprocess(output))
         return self.audio_output_frames.pop(0)
+    
+    async def get_nodes_info(self) -> Dict[str, Any]:
+        """Get information about all nodes in the current prompt including metadata."""
+        nodes_info = await self.client.get_available_nodes()
+        return nodes_info

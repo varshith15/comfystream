@@ -1,4 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 /**
  * Internal component that renders and captures camera feed at exactly 512x512.
@@ -28,7 +34,6 @@ function StreamCanvas({
       ...audioTracks,
     ]);
     onStreamReady(combinedStream);
-
     return () => {
       combinedStream.getTracks().forEach((track) => track.stop());
     };
@@ -94,15 +99,26 @@ function StreamCanvas({
   }, [stream]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={512}
-      height={512}
-      className="w-full h-full"
-      style={{
-        backgroundColor: "black",
-      }}
-    />
+    <>
+      <div className="relative">
+        <canvas
+          ref={canvasRef}
+          width={512}
+          height={512}
+          className="w-full h-full"
+        />
+        <div className="absolute top-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-sm">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger>{frameRate} FPS</TooltipTrigger>
+              <TooltipContent>
+                <p>This is the requested FPS of your device.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </div>
+    </>
   );
 }
 

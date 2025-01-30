@@ -107,7 +107,7 @@ async def offer(request):
     params = await request.json()
 
     await pipeline.set_prompts(params["prompts"])
-    await pipeline.warm()
+    # await pipeline.warm()
 
     offer_params = params["offer"]
     offer = RTCSessionDescription(sdp=offer_params["sdp"], type=offer_params["type"])
@@ -197,6 +197,11 @@ async def offer(request):
             pcs.discard(pc)
 
     await pc.setRemoteDescription(offer)
+
+    if "m=audio" in pc.remoteDescription.sdp:
+        await pipeline.warm_audio()
+    if "m=video" in pc.remoteDescription.sdp:
+        await pipeline.warm_video()
 
     answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)

@@ -16,13 +16,15 @@ class Pipeline:
         self.video_futures = asyncio.Queue()
         self.audio_futures = asyncio.Queue()
 
-    async def warm(self):
+    async def warm_video(self):
         dummy_video_inp = torch.randn(1, 512, 512, 3)
-        dummy_audio_inp = np.random.randint(-32768, 32767, 48 * 20, dtype=np.int16)  # TODO: might affect the workflow, due to buffering
 
         for _ in range(WARMUP_RUNS):
             image_out_fut = self.client.put_video_input(dummy_video_inp)
             await image_out_fut
+
+    async def warm_audio(self):
+        dummy_audio_inp = np.random.randint(-32768, 32767, 48 * 20, dtype=np.int16)  # TODO: might affect the workflow, due to buffering
 
         futs = []
         for _ in range(WARMUP_RUNS):

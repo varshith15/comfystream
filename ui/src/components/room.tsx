@@ -192,6 +192,7 @@ export function Room() {
                     onStreamReady={onStreamReady}
                     deviceId={config.selectedDeviceId}
                     frameRate={config.frameRate}
+                    selectedAudioDeviceId={config.selectedAudioDeviceId}
                   />
                 </div>
               </div>
@@ -201,7 +202,7 @@ export function Room() {
                   onStreamReady={onStreamReady}
                   deviceId={config.selectedDeviceId}
                   frameRate={config.frameRate}
-                  selectedAudioDeviceId={config.selectedAudioDeviceId} // Pass audio device ID
+                  selectedAudioDeviceId={config.selectedAudioDeviceId}
                 />
               </div>
             </div>

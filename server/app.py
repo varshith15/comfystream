@@ -106,7 +106,7 @@ async def offer(request):
 
     params = await request.json()
 
-    pipeline.set_prompts(params["prompts"])
+    await pipeline.set_prompts(params["prompts"])
     await pipeline.warm()
 
     offer_params = params["offer"]
@@ -213,7 +213,7 @@ async def set_prompt(request):
     pipeline = request.app["pipeline"]
 
     prompt = await request.json()
-    pipeline.set_prompts(prompt)
+    await pipeline.set_prompts(prompt)
 
     return web.Response(content_type="application/json", text="OK")
 

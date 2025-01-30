@@ -1,16 +1,12 @@
-import torch
 import av
+import torch
 import numpy as np
-import fractions
 import asyncio
 
-from av import AudioFrame
-from typing import Any, Dict, Optional, Union, List
+from typing import Any, Dict, Union, List
 from comfystream.client import ComfyStreamClient
-from comfystream import tensor_cache
 
-WARMUP_RUNS = 5
-
+WARMUP_RUNS = 10
 
 
 class Pipeline:
@@ -19,53 +15,39 @@ class Pipeline:
 
         self.video_futures = asyncio.Queue()
         self.audio_futures = asyncio.Queue()
-
-        self.audio_output_frames = []
         
         self.resampler = av.audio.resampler.AudioResampler(format='s16', layout='mono', rate=48000) # find a better way to convert to mono
-        self.sample_rate = 48000 # instead of hardcoding, find a clean way to set from audio frame
-        self.frame_size = int(self.sample_rate * 0.02)
-        self.time_base = fractions.Fraction(1, self.sample_rate)
-        self.curr_pts = 0 # figure out a better way to set back pts to processed audio frames
-
-    def set_prompt(self, prompt: Dict[Any, Any]):
-        self.client.set_prompt(prompt)
 
     async def warm(self):
-        dummy_video_frame = torch.randn(1, 512, 512, 3)
-        dummy_audio_frame = np.random.randint(-32768, 32767, 48000 * 1, dtype=np.int16)
+        dummy_video_inp = torch.randn(1, 512, 512, 3)
+        dummy_audio_inp = np.random.randint(-32768, 32767, 48 * 20, dtype=np.int16)  # has to be more than the buffer size in comfy workflow
 
         for _ in range(WARMUP_RUNS):
-            image_out_fut = asyncio.Future()
-            audio_out_fut = asyncio.Future()
-            tensor_cache.image_outputs.put(image_out_fut)
-            tensor_cache.audio_outputs.put(audio_out_fut)
-
-            tensor_cache.image_inputs.put(dummy_video_frame)
-            tensor_cache.audio_inputs.put(dummy_audio_frame)
-
+            image_out_fut = self.client.put_video_input(dummy_video_inp)
             await image_out_fut
-            await audio_out_fut
 
-    def set_prompts(self, prompts: Union[Dict[Any, Any], List[Dict[Any, Any]]]):
+        futs = []
+        for _ in range(WARMUP_RUNS):
+            audio_out_fut = self.client.put_audio_input(dummy_audio_inp)
+            futs.append(audio_out_fut)
+
+        await asyncio.gather(*futs)
+
+    async def set_prompts(self, prompts: Union[Dict[Any, Any], List[Dict[Any, Any]]]):
         if isinstance(prompts, dict):
-            self.client.set_prompts([prompts])
+            await self.client.set_prompts([prompts])
         else:
-            self.client.set_prompts(prompts)
+            await self.client.set_prompts(prompts)
 
     async def put_video_frame(self, frame: av.VideoFrame):
         inp_tensor = self.video_preprocess(frame)
-        out_future = asyncio.Future()
-        tensor_cache.image_outputs.put(out_future)
-        tensor_cache.image_inputs.put(inp_tensor)
+        out_future = self.client.put_video_input(inp_tensor)
         await self.video_futures.put((out_future, frame.pts, frame.time_base))
 
     async def put_audio_frame(self, frame: av.AudioFrame):
         inp_tensor = self.audio_preprocess(frame)
-        out_future = asyncio.Future()
-        tensor_cache.audio_outputs.put(out_future)
-        tensor_cache.audio_inputs.put(inp_tensor)
-        await self.audio_futures.put(out_future)
+        out_future = self.client.put_audio_input(inp_tensor)
+        await self.audio_futures.put((out_future, frame.pts, frame.time_base, frame.sample_rate))
 
     def video_preprocess(self, frame: av.VideoFrame) -> torch.Tensor:
         frame_np = frame.to_ndarray(format="rgb24").astype(np.float32) / 255.0
@@ -80,18 +62,7 @@ class Pipeline:
         )
 
     def audio_postprocess(self, output: torch.Tensor) -> av.AudioFrame:
-        frames = []
-        for idx in range(0, len(output), self.frame_size):
-            frame_samples = output[idx:idx + self.frame_size]
-            frame_samples = frame_samples.reshape(1, -1).astype(np.int16)
-            frame = AudioFrame.from_ndarray(frame_samples, layout="mono")
-            frame.sample_rate = self.sample_rate
-            frame.pts = self.curr_pts
-            frame.time_base = self.time_base
-            self.curr_pts += 960
-
-            frames.append(frame)
-        return frames
+        return av.AudioFrame.from_ndarray(output.reshape(1, -1), layout="mono")
     
     async def get_processed_video_frame(self):
         out_fut, pts, time_base = await self.video_futures.get()
@@ -101,14 +72,12 @@ class Pipeline:
         return frame
 
     async def get_processed_audio_frame(self):
-        while not self.audio_output_frames:
-            out_fut = await self.audio_futures.get()
-            output = await out_fut
-            if output is None:
-                print("No Audio output")
-                continue
-            self.audio_output_frames.extend(self.audio_postprocess(output))
-        return self.audio_output_frames.pop(0)
+        out_fut, pts, time_base, sample_rate = await self.audio_futures.get()
+        frame = self.audio_postprocess(await out_fut)
+        frame.pts = pts
+        frame.time_base = time_base
+        frame.sample_rate = sample_rate
+        return frame
     
     async def get_nodes_info(self) -> Dict[str, Any]:
         """Get information about all nodes in the current prompt including metadata."""

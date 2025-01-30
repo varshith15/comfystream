@@ -8,13 +8,15 @@ class LoadAudioTensor:
     FUNCTION = "execute"
 
     def __init__(self):
-        self.audio_buffer = np.array([])
+        self.audio_buffer = np.array([], dtype=np.int16)
+        self.buffer_samples = None
 
     @classmethod
     def INPUT_TYPES(s):
         return {
             "required": {
-                "buffer_size": ("FLOAT", {"default": 500.0})
+                "buffer_size": ("FLOAT", {"default": 500.0}),
+                "sample_rate": ("INT", {"default": 48000})
             }
         }
 
@@ -22,15 +24,14 @@ class LoadAudioTensor:
     def IS_CHANGED():
         return float("nan")
 
-    def execute(self, buffer_size):
-        audio = tensor_cache.audio_inputs.get(block=True)
-        self.audio_buffer = np.concatenate((self.audio_buffer, audio))
-        
-        buffer_size_samples = int(buffer_size * 48)
+    def execute(self, buffer_size, sample_rate):
+        if not self.buffer_samples:
+            self.buffer_samples = int(buffer_size * sample_rate / 1000)
 
-        if self.audio_buffer.size >= buffer_size_samples:
-            buffered_audio = self.audio_buffer[:buffer_size_samples]
-            self.audio_buffer = self.audio_buffer[buffer_size_samples:]
-            return (buffered_audio,)
-        else:
-            return (None,)
+        while self.audio_buffer.size < self.buffer_samples:
+            audio = tensor_cache.audio_inputs.get()
+            self.audio_buffer = np.concatenate((self.audio_buffer, audio))
+
+        buffered_audio = self.audio_buffer
+        self.audio_buffer = np.array([], dtype=np.int16)
+        return (buffered_audio,)

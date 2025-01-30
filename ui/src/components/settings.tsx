@@ -116,17 +116,17 @@ interface ConfigFormProps {
 }
 
 interface PromptContextType {
-  originalPrompt: any;
-  currentPrompt: any;
-  setOriginalPrompt: (prompt: any) => void;
-  setCurrentPrompt: (prompt: any) => void;
+  originalPrompts: any;
+  currentPrompts: any;
+  setOriginalPrompts: (prompts: any) => void;
+  setCurrentPrompts: (prompts: any) => void;
 }
 
 export const PromptContext = createContext<PromptContextType>({
-  originalPrompt: null,
-  currentPrompt: null,
-  setOriginalPrompt: () => {},
-  setCurrentPrompt: () => {},
+  originalPrompts: null,
+  currentPrompts: null,
+  setOriginalPrompts: () => {},
+  setCurrentPrompts: () => {},
 });
 
 export const usePrompt = () => useContext(PromptContext);

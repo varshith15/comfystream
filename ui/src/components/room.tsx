@@ -19,21 +19,69 @@ interface MediaStreamPlayerProps {
 
 function MediaStreamPlayer({ stream }: MediaStreamPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [needsPlayButton, setNeedsPlayButton] = useState(false);
 
   useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
-    }
+    if (!videoRef.current || !stream) return;
+
+    const video = videoRef.current;
+    video.srcObject = stream;
+    setNeedsPlayButton(false);
+
+    // Handle autoplay
+    const playStream = async () => {
+      try {
+        // Only attempt to play if the video element exists and has a valid srcObject
+        if (video && video.srcObject) {
+          await video.play();
+          setNeedsPlayButton(false);
+        }
+      } catch (error) {
+        // Log error but don't throw - this is likely due to browser autoplay policy
+        console.warn("Autoplay prevented:", error);
+        setNeedsPlayButton(true);
+      }
+    };
+    playStream();
+
+    return () => {
+      if (video) {
+        video.srcObject = null;
+        video.pause();
+      }
+    };
   }, [stream]);
 
+  const handlePlayClick = async () => {
+    try {
+      if (videoRef.current) {
+        await videoRef.current.play();
+        setNeedsPlayButton(false);
+      }
+    } catch (error) {
+      console.warn("Manual play failed:", error);
+    }
+  };
+
   return (
-    <video
-      ref={videoRef}
-      autoPlay
-      playsInline
-      // muted
-      className="w-full h-full"
-    />
+    <div className="relative w-full h-full">
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        className="w-full h-full"
+      />
+      {needsPlayButton && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+          <button
+            onClick={handlePlayClick}
+            className="px-4 py-2 bg-white text-black rounded-md hover:bg-gray-200 transition-colors"
+          >
+            Click to Play
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

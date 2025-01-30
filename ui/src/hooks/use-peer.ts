@@ -81,7 +81,10 @@ export function usePeer(props: PeerProps): Peer {
       const pc = new RTCPeerConnection(configuration);
       setPeerConnection(pc);
 
-      pc.addTransceiver("video");
+      // Only add video transceiver if we have video tracks
+      if (localStream.getVideoTracks().length > 0) {
+        pc.addTransceiver("video");
+      }
 
       localStream.getTracks().forEach((track) => {
         pc.addTrack(track, localStream);
@@ -109,8 +112,16 @@ export function usePeer(props: PeerProps): Peer {
       };
 
       pc.ontrack = (event) => {
-        if (event.track.kind == "video") {
+        if (event.track.kind === "video") {
           setRemoteStream(event.streams[0]);
+        } else if (event.track.kind === "audio") {
+          // If we already have a remote stream, add the audio track to it
+          if (remoteStream) {
+            remoteStream.addTrack(event.track);
+          } else {
+            // Otherwise create a new stream with the audio track
+            setRemoteStream(new MediaStream([event.track]));
+          }
         }
       };
 

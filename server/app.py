@@ -124,15 +124,17 @@ async def offer(request):
 
     tracks = {"video": None, "audio": None}
 
-    # Prefer h264
-    transceiver = pc.addTransceiver("video")
-    caps = RTCRtpSender.getCapabilities("video")
-    prefs = list(filter(lambda x: x.name == "H264", caps.codecs))
-    transceiver.setCodecPreferences(prefs)
+    # Only add video transceiver if video is present in the offer
+    if "m=video" in offer.sdp:
+        # Prefer h264
+        transceiver = pc.addTransceiver("video")
+        caps = RTCRtpSender.getCapabilities("video")
+        prefs = list(filter(lambda x: x.name == "H264", caps.codecs))
+        transceiver.setCodecPreferences(prefs)
 
-    # Monkey patch max and min bitrate to ensure constant bitrate
-    h264.MAX_BITRATE = MAX_BITRATE
-    h264.MIN_BITRATE = MIN_BITRATE
+        # Monkey patch max and min bitrate to ensure constant bitrate
+        h264.MAX_BITRATE = MAX_BITRATE
+        h264.MIN_BITRATE = MIN_BITRATE
 
     # Handle control channel from client
     @pc.on("datachannel")

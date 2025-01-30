@@ -149,40 +149,56 @@ function ConfigForm({ config, onSubmit }: ConfigFormProps) {
       await navigator.mediaDevices.getUserMedia({ video: true });
 
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices
-        .filter((device) => device.kind === "videoinput")
-        .map((device) => ({
-          deviceId: device.deviceId,
-          label: device.label || `Camera ${device.deviceId.slice(0, 5)}...`,
-        }));
+      const videoDevices = [
+        { deviceId: "none", label: "No Video" },
+        ...devices
+          .filter((device) => device.kind === "videoinput")
+          .map((device) => ({
+            deviceId: device.deviceId,
+            label: device.label || `Camera ${device.deviceId.slice(0, 5)}...`,
+          }))
+      ];
 
       setVideoDevices(videoDevices);
-      if (videoDevices.length > 0) {
-        setSelectedDevice((curr) => curr || videoDevices[0].deviceId);
+      // Set default to first available camera if no selection yet
+      if (!selectedDevice && videoDevices.length > 1) {
+        setSelectedDevice(videoDevices[1].deviceId); // Index 1 because 0 is "No Video"
       }
     } catch (err) {
       console.error("Failed to get video devices");
+      // If we can't access video devices, still provide the None option
+      const videoDevices = [{ deviceId: "none", label: "No Video" }];
+      setVideoDevices(videoDevices);
+      setSelectedDevice("none");
     }
-  }, []);
+  }, [selectedDevice]);
 
   const getAudioDevices = useCallback(async () => {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const audioDevices = devices
-        .filter((device) => device.kind === "audioinput")
-        .map((device) => ({
-          deviceId: device.deviceId,
-          label: device.label || `Microphone ${device.deviceId.slice(0, 5)}...`,
-        }));
+      const audioDevices = [
+        { deviceId: "none", label: "No Audio" },
+        ...devices
+          .filter((device) => device.kind === "audioinput")
+          .map((device) => ({
+            deviceId: device.deviceId,
+            label: device.label || `Microphone ${device.deviceId.slice(0, 5)}...`,
+          }))
+      ];
 
       setAudioDevices(audioDevices);
-      if (audioDevices.length > 0) {
-        setSelectedAudioDevice((curr) => curr || audioDevices[0].deviceId);
+      // Set default to first available microphone if no selection yet
+      if (!selectedAudioDevice && audioDevices.length > 1) {
+        setSelectedAudioDevice(audioDevices[1].deviceId); // Index 1 because 0 is "No Audio"
       }
     } catch (err) {
       console.error("Failed to get audio devices");
+      // If we can't access audio devices, still provide the None option
+      const audioDevices = [{ deviceId: "none", label: "No Audio" }];
+      setAudioDevices(audioDevices);
+      setSelectedAudioDevice("none");
     }
-  }, []);
+  }, [selectedAudioDevice]);
 
   useEffect(() => {
     getVideoDevices();
@@ -267,8 +283,7 @@ function ConfigForm({ config, onSubmit }: ConfigFormProps) {
           <Label>Camera</Label>
           <Select value={selectedDevice} onValueChange={setSelectedDevice}>
             <Select.Trigger className="w-full mt-2">
-              {videoDevices.find((d) => d.deviceId === selectedDevice)?.label ||
-                "Select camera"}
+              {selectedDevice ? (videoDevices.find((d) => d.deviceId === selectedDevice)?.label || "None") : "None"}
             </Select.Trigger>
             <Select.Content>
               {videoDevices.map((device) => (
@@ -284,8 +299,7 @@ function ConfigForm({ config, onSubmit }: ConfigFormProps) {
           <Label>Microphone</Label>
           <Select value={selectedAudioDevice} onValueChange={setSelectedAudioDevice}>
             <Select.Trigger className="w-full mt-2">
-              {audioDevices.find((d) => d.deviceId === selectedAudioDevice)?.label ||
-                "Select microphone"}
+              {selectedAudioDevice ? (audioDevices.find((d) => d.deviceId === selectedAudioDevice)?.label || "None") : "None"}
             </Select.Trigger>
             <Select.Content>
               {audioDevices.map((device) => (

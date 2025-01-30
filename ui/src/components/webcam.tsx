@@ -23,45 +23,27 @@ function StreamCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
+  // Only set up canvas animation if we have video
   useEffect(() => {
-    if (!stream) return;
+    if (!stream || stream.getVideoTracks().length === 0) return;
 
-    const canvas = canvasRef.current!;
-    const videoOnlyStream = canvas.captureStream(frameRate);
-    const audioTracks = stream.getAudioTracks();
-    const combinedStream = new MediaStream([
-      ...videoOnlyStream.getVideoTracks(),
-      ...audioTracks,
-    ]);
-    onStreamReady(combinedStream);
-    return () => {
-      combinedStream.getTracks().forEach((track) => track.stop());
-    };
-  }, [stream, frameRate, onStreamReady]);
-
-  // Set up canvas animation loop
-  useEffect(() => {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
 
     let isActive = true;
     const drawFrame = () => {
-      if (!isActive) {
-        // return without scheduling another frame
+      if (!isActive || !videoRef.current) {
         return;
       }
-      const video = videoRef.current!;
+      const video = videoRef.current;
       if (!video?.videoWidth) {
-        // video is not ready yet
         requestAnimationFrame(drawFrame);
         return;
       }
 
       const scale = Math.max(512 / video.videoWidth, 512 / video.videoHeight);
-
       const scaledWidth = video.videoWidth * scale;
       const scaledHeight = video.videoHeight * scale;
-
       const offsetX = (512 - scaledWidth) / 2;
       const offsetY = (512 - scaledHeight) / 2;
 
@@ -75,10 +57,12 @@ function StreamCanvas({
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [stream]);
 
+  // Only set up video element if we have video
   useEffect(() => {
-    if (!stream) return;
+    if (!stream || stream.getVideoTracks().length === 0) return;
+    
     if (!videoRef.current) {
       videoRef.current = document.createElement("video");
       videoRef.current.muted = true;
@@ -88,15 +72,22 @@ function StreamCanvas({
     video.srcObject = stream;
     video.onloadedmetadata = () => {
       video.play().catch((error) => {
-        console.log("Video play failed:", error);
+        console.error("Video play failed:", error);
       });
     };
 
     return () => {
-      video.pause();
-      video.srcObject = null;
+      if (video) {
+        video.pause();
+        video.srcObject = null;
+      }
     };
   }, [stream]);
+
+  // Only render canvas if we have video
+  if (!stream || stream.getVideoTracks().length === 0) {
+    return null;
+  }
 
   return (
     <>
@@ -138,16 +129,12 @@ export function Webcam({ onStreamReady, deviceId, frameRate, selectedAudioDevice
       if (oldStream) {
         oldStream.getTracks().forEach((track) => track.stop());
       }
-      if (newStream) {
-        const videoTrack = newStream.getVideoTracks()[0];
-        const settings = videoTrack.getSettings();
-      }
       return newStream;
     });
   }, []);
 
   const startWebcam = useCallback(async () => {
-    if (!deviceId || !selectedAudioDeviceId) {
+    if (deviceId === "none" && selectedAudioDeviceId === "none") {
       return null;
     }
     if (frameRate == 0) {
@@ -155,16 +142,16 @@ export function Webcam({ onStreamReady, deviceId, frameRate, selectedAudioDevice
     }
 
     try {
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+      const constraints: MediaStreamConstraints = {
+        video: deviceId === "none" ? false : {
+          deviceId: { exact: deviceId },
           width: { ideal: 512 },
           height: { ideal: 512 },
           aspectRatio: { ideal: 1 },
           frameRate: { ideal: frameRate, max: frameRate },
         },
-        audio: {
-          ...(selectedAudioDeviceId ? { deviceId: { exact: selectedAudioDeviceId } } : {}),
+        audio: selectedAudioDeviceId === "none" ? false : {
+          deviceId: { exact: selectedAudioDeviceId },
           sampleRate: 48000,
           channelCount: 2,
           sampleSize: 16,
@@ -172,8 +159,28 @@ export function Webcam({ onStreamReady, deviceId, frameRate, selectedAudioDevice
           noiseSuppression: false,
           autoGainControl: false,
         },
+      };
+
+      const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      // Create a new stream with only the tracks we want
+      const filteredTracks: MediaStreamTrack[] = [];
+      if (deviceId !== "none") {
+        filteredTracks.push(...newStream.getVideoTracks());
+      }
+      if (selectedAudioDeviceId !== "none") {
+        filteredTracks.push(...newStream.getAudioTracks());
+      }
+      
+      // Stop any tracks we're not using
+      newStream.getTracks().forEach(track => {
+        if (!filteredTracks.includes(track)) {
+          track.stop();
+        }
       });
-      return newStream;
+
+      const filteredStream = new MediaStream(filteredTracks);
+      return filteredStream;
     } catch (error) {
       console.error("Error accessing media devices.", error);
       return null;
@@ -181,12 +188,17 @@ export function Webcam({ onStreamReady, deviceId, frameRate, selectedAudioDevice
   }, [deviceId, frameRate, selectedAudioDeviceId]);
 
   useEffect(() => {
-    if (!deviceId || !selectedAudioDeviceId) return;
+    if (deviceId === "none" && selectedAudioDeviceId === "none") return;
     if (frameRate == 0) return;
 
     startWebcam().then((newStream) => {
       replaceStream(newStream);
       if (newStream) {
+        // Only pass to StreamCanvas if we have video
+        if (deviceId !== "none") {
+          setStream(newStream);
+        }
+        // Only call onStreamReady if we have a valid stream
         onStreamReady(newStream);
       }
     });
@@ -196,12 +208,19 @@ export function Webcam({ onStreamReady, deviceId, frameRate, selectedAudioDevice
     };
   }, [deviceId, frameRate, selectedAudioDeviceId, startWebcam, replaceStream, onStreamReady]);
 
+  // Only render StreamCanvas if video is enabled
+  if (deviceId === "none") {
+    return null;
+  }
+
   return (
     <div>
       <StreamCanvas
         stream={stream}
         frameRate={frameRate}
-        onStreamReady={onStreamReady}
+        onStreamReady={(processedStream) => {
+          // Don't call onStreamReady here anymore since we handle it above
+        }}
       />
     </div>
   );

@@ -81,7 +81,6 @@ export function usePeer(props: PeerProps): Peer {
       const pc = new RTCPeerConnection(configuration);
       setPeerConnection(pc);
 
-      // Only add video transceiver if we have video tracks
       if (localStream.getVideoTracks().length > 0) {
         pc.addTransceiver("video");
       }
@@ -90,38 +89,19 @@ export function usePeer(props: PeerProps): Peer {
         pc.addTrack(track, localStream);
       });
 
-      // Create control channel for both negotiation and control
       const channel = pc.createDataChannel("control");
       
       channel.onopen = () => {
-        console.log("[usePeer] Control channel opened, readyState:", channel.readyState);
         setControlChannel(channel);
       };
 
       channel.onclose = () => {
-        console.log("[usePeer] Control channel closed");
         setControlChannel(null);
       };
 
-      channel.onerror = (error) => {
-        console.error("Control channel error:", error);
-      };
-
-      channel.onmessage = (event) => {
-        console.log("Received message on control channel:", event.data);
-      };
-
       pc.ontrack = (event) => {
-        if (event.track.kind === "video") {
+        if (event.streams && event.streams[0]) {
           setRemoteStream(event.streams[0]);
-        } else if (event.track.kind === "audio") {
-          // If we already have a remote stream, add the audio track to it
-          if (remoteStream) {
-            remoteStream.addTrack(event.track);
-          } else {
-            // Otherwise create a new stream with the audio track
-            setRemoteStream(new MediaStream([event.track]));
-          }
         }
       };
 
@@ -141,7 +121,7 @@ export function usePeer(props: PeerProps): Peer {
         await pc.setLocalDescription(offer);
       };
 
-      createOffer().catch(console.error);
+      createOffer();
     } else {
       if (connectionStateTimeoutRef.current) {
         clearTimeout(connectionStateTimeoutRef.current);

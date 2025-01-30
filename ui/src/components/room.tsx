@@ -20,6 +20,7 @@ interface MediaStreamPlayerProps {
 function MediaStreamPlayer({ stream }: MediaStreamPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [needsPlayButton, setNeedsPlayButton] = useState(false);
+  const hasVideo = stream.getVideoTracks().length > 0;
 
   useEffect(() => {
     if (!videoRef.current || !stream) return;
@@ -124,7 +125,6 @@ function Stage({ connected, onStreamReady }: StageProps) {
           className="w-full h-full object-cover"
           autoPlay
           loop
-          // muted
           playsInline
         >
           <source src="/loading.mp4" type="video/mp4" />
@@ -133,19 +133,23 @@ function Stage({ connected, onStreamReady }: StageProps) {
     );
   }
 
+  const hasVideo = remoteStream.getVideoTracks().length > 0;
+
   return (
     <div className="relative w-full h-full">
       <MediaStreamPlayer stream={remoteStream} />
-      <div className="absolute top-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-sm">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger>{frameRate} FPS</TooltipTrigger>
-            <TooltipContent>
-              <p>This is the FPS of the output stream.</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
+      {hasVideo && (
+        <div className="absolute top-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-sm">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger>{frameRate} FPS</TooltipTrigger>
+              <TooltipContent>
+                <p>This is the FPS of the output stream.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      )}
     </div>
   );
 }
@@ -200,17 +204,15 @@ export function Room() {
 
   const handleConnected = useCallback(() => {
     setIsConnected(true);
-
-    console.debug("Connected!");
-
     connectingRef.current = false;
   }, []);
 
   const handleDisconnected = useCallback(() => {
     setIsConnected(false);
-
-    console.debug("Disconnected!");
   }, []);
+
+  // Check if we have video tracks in the local stream
+  const hasLocalVideo = localStream && localStream.getVideoTracks().length > 0;
 
   return (
     <main className="fixed inset-0 overflow-hidden overscroll-none">

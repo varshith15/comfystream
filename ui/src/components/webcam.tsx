@@ -162,25 +162,7 @@ export function Webcam({ onStreamReady, deviceId, frameRate, selectedAudioDevice
       };
 
       const newStream = await navigator.mediaDevices.getUserMedia(constraints);
-      
-      // Create a new stream with only the tracks we want
-      const filteredTracks: MediaStreamTrack[] = [];
-      if (deviceId !== "none") {
-        filteredTracks.push(...newStream.getVideoTracks());
-      }
-      if (selectedAudioDeviceId !== "none") {
-        filteredTracks.push(...newStream.getAudioTracks());
-      }
-      
-      // Stop any tracks we're not using
-      newStream.getTracks().forEach(track => {
-        if (!filteredTracks.includes(track)) {
-          track.stop();
-        }
-      });
-
-      const filteredStream = new MediaStream(filteredTracks);
-      return filteredStream;
+      return newStream;
     } catch (error) {
       console.error("Error accessing media devices.", error);
       return null;
@@ -192,13 +174,9 @@ export function Webcam({ onStreamReady, deviceId, frameRate, selectedAudioDevice
     if (frameRate == 0) return;
 
     startWebcam().then((newStream) => {
-      replaceStream(newStream);
       if (newStream) {
-        // Only pass to StreamCanvas if we have video
-        if (deviceId !== "none") {
-          setStream(newStream);
-        }
-        // Only call onStreamReady if we have a valid stream
+        replaceStream(newStream);
+        setStream(newStream);
         onStreamReady(newStream);
       }
     });
@@ -208,8 +186,20 @@ export function Webcam({ onStreamReady, deviceId, frameRate, selectedAudioDevice
     };
   }, [deviceId, frameRate, selectedAudioDeviceId, startWebcam, replaceStream, onStreamReady]);
 
-  // Only render StreamCanvas if video is enabled
-  if (deviceId === "none") {
+  const hasVideo = stream && stream.getVideoTracks().length > 0;
+  const hasAudio = stream && stream.getAudioTracks().length > 0;
+
+  // Return audio-only placeholder if we have audio but no video
+  if (!hasVideo && hasAudio) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <span className="text-white">Audio Only</span>
+      </div>
+    );
+  }
+
+  // Return null if we have neither video nor audio
+  if (!stream || (!hasVideo && !hasAudio)) {
     return null;
   }
 
@@ -218,9 +208,7 @@ export function Webcam({ onStreamReady, deviceId, frameRate, selectedAudioDevice
       <StreamCanvas
         stream={stream}
         frameRate={frameRate}
-        onStreamReady={(processedStream) => {
-          // Don't call onStreamReady here anymore since we handle it above
-        }}
+        onStreamReady={() => {}} // We handle stream ready in the parent component
       />
     </div>
   );

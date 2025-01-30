@@ -1,8 +1,4 @@
-import queue
-import logging
 from comfystream import tensor_cache
-
-logger = logging.getLogger(__name__)
 
 class SaveAudioTensor:
     CATEGORY = "audio_utils"

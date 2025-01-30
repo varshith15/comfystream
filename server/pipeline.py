@@ -11,16 +11,14 @@ WARMUP_RUNS = 10
 
 class Pipeline:
     def __init__(self, **kwargs):
-        self.client = ComfyStreamClient(**kwargs, max_workers=5) # hardcoded max workers
+        self.client = ComfyStreamClient(**kwargs, max_workers=5) # TODO: hardcoded max workers, should it be configurable?
 
         self.video_futures = asyncio.Queue()
         self.audio_futures = asyncio.Queue()
-        
-        self.resampler = av.audio.resampler.AudioResampler(format='s16', layout='mono', rate=48000) # find a better way to convert to mono
 
     async def warm(self):
         dummy_video_inp = torch.randn(1, 512, 512, 3)
-        dummy_audio_inp = np.random.randint(-32768, 32767, 48 * 20, dtype=np.int16)  # has to be more than the buffer size in comfy workflow
+        dummy_audio_inp = np.random.randint(-32768, 32767, 48 * 20, dtype=np.int16)  # TODO: might affect the workflow, due to buffering
 
         for _ in range(WARMUP_RUNS):
             image_out_fut = self.client.put_video_input(dummy_video_inp)
@@ -54,7 +52,7 @@ class Pipeline:
         return torch.from_numpy(frame_np).unsqueeze(0)
     
     def audio_preprocess(self, frame: av.AudioFrame) -> torch.Tensor:
-        return self.resampler.resample(frame)[0].to_ndarray().flatten()
+        return frame.to_ndarray().ravel().reshape(-1, 2).mean(axis=1).astype(np.int16)
     
     def video_postprocess(self, output: torch.Tensor) -> av.VideoFrame:
         return av.VideoFrame.from_ndarray(

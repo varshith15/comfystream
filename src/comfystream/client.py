@@ -41,16 +41,16 @@ class ComfyStreamClient:
                 raise
 
     def put_video_input(self, inp_tensor):
-        out_future = asyncio.Future()
-        tensor_cache.image_outputs.put(out_future)
         tensor_cache.image_inputs.put(inp_tensor)
-        return out_future
     
     def put_audio_input(self, inp_tensor):
-        out_future = asyncio.Future()
-        tensor_cache.audio_outputs.put(out_future)
         tensor_cache.audio_inputs.put(inp_tensor)
-        return out_future
+
+    async def get_video_output(self):
+        return await tensor_cache.image_outputs.get()
+    
+    async def get_audio_output(self):
+        return await tensor_cache.audio_outputs.get()
 
     async def get_available_nodes(self):
         """Get metadata and available nodes info in a single pass"""

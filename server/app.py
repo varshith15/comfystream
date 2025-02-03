@@ -107,7 +107,6 @@ async def offer(request):
     params = await request.json()
 
     await pipeline.set_prompts(params["prompts"])
-    # await pipeline.warm()
 
     offer_params = params["offer"]
     offer = RTCSessionDescription(sdp=offer_params["sdp"], type=offer_params["type"])
@@ -152,13 +151,13 @@ async def offer(request):
                             "nodes": nodes_info
                         }
                         channel.send(json.dumps(response))
-                    elif params.get("type") == "update_prompt":
-                        if "prompt" not in params:
+                    elif params.get("type") == "update_prompts":
+                        if "prompts" not in params:
                             logger.warning("[Control] Missing prompt in update_prompt message")
                             return
-                        pipeline.set_prompt(params["prompt"])
+                        pipeline.set_prompts(params["prompts"])
                         response = {
-                            "type": "prompt_updated",
+                            "type": "prompts_updated",
                             "success": True
                         }
                         channel.send(json.dumps(response))

@@ -1,9 +1,13 @@
-import asyncio
 import torch
+import numpy as np
+
 from queue import Queue
+from asyncio import Queue as AsyncQueue
 
-image_inputs: Queue[torch.Tensor] = Queue()
-image_outputs: Queue[asyncio.Future] = Queue()
+from typing import Union
 
-audio_inputs: Queue[torch.Tensor] = Queue()
-audio_outputs: Queue[asyncio.Future] = Queue()
+image_inputs: Queue[Union[torch.Tensor, np.ndarray]] = Queue()
+image_outputs: AsyncQueue[Union[torch.Tensor, np.ndarray]] = AsyncQueue()
+
+audio_inputs: Queue[Union[torch.Tensor, np.ndarray]] = Queue()
+audio_outputs: AsyncQueue[Union[torch.Tensor, np.ndarray]] = AsyncQueue()

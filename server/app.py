@@ -155,7 +155,7 @@ async def offer(request):
                         if "prompts" not in params:
                             logger.warning("[Control] Missing prompt in update_prompt message")
                             return
-                        pipeline.set_prompts(params["prompts"])
+                        await pipeline.update_prompts(params["prompts"])
                         response = {
                             "type": "prompts_updated",
                             "success": True

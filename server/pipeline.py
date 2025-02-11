@@ -17,6 +17,7 @@ class Pipeline:
         self.audio_incoming_frames = asyncio.Queue()
 
         self.processed_audio_buffer = np.array([], dtype=np.int16)
+        self.has_audio_nodes = False
 
     async def warm_video(self):
         dummy_video_inp = torch.randn(1, 512, 512, 3)
@@ -26,7 +27,10 @@ class Pipeline:
             await self.client.get_video_output()
 
     async def warm_audio(self):
-        dummy_audio_inp = np.random.randint(-32768, 32767, int(48000 * 0.5), dtype=np.int16)  # TODO: adds a lot of delay if it doesn't match the buffer size, is warmup needed?
+        if not self.has_audio_nodes:
+            return
+
+        dummy_audio_inp = np.random.randint(-32768, 32767, int(48000 * 0.5), dtype=np.int16)
 
         for _ in range(WARMUP_RUNS):
             self.client.put_audio_input((dummy_audio_inp, 48000))
@@ -35,8 +39,17 @@ class Pipeline:
     async def set_prompts(self, prompts: Union[Dict[Any, Any], List[Dict[Any, Any]]]):
         if isinstance(prompts, list):
             await self.client.set_prompts(prompts)
+            self.has_audio_nodes = any(
+                node.get("class_type") in ["LoadAudioTensor", "SaveAudioTensor"]
+                for prompt in prompts
+                for node in prompt.values()
+            )
         else:
             await self.client.set_prompts([prompts])
+            self.has_audio_nodes = any(
+                node.get("class_type") in ["LoadAudioTensor", "SaveAudioTensor"]
+                for node in prompts.values()
+            )
 
     async def put_video_frame(self, frame: av.VideoFrame):
         inp_tensor = self.video_preprocess(frame)

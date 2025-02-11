@@ -26,6 +26,7 @@ class ComfyStreamClient:
             task = asyncio.create_task(self.run_prompt(idx))
             self.running_prompts[idx] = task
 
+
     async def update_prompts(self, prompts: List[PromptDictInput]):
         # TODO: currently under the assumption that only already running prompts are updated
         if len(prompts) != len(self.current_prompts):

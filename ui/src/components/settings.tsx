@@ -1,3 +1,6 @@
+/**
+ * @file Contains a StreamSettings component for configuring stream settings.
+ */
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -38,8 +41,8 @@ export interface StreamConfig {
   streamUrl: string;
   frameRate: number;
   prompts?: any;
-  selectedDeviceId: string;
-  selectedAudioDeviceId: string;
+  selectedDeviceId: string | undefined;
+  selectedAudioDeviceId: string | undefined;
 }
 
 interface VideoDevice {
@@ -51,8 +54,8 @@ export const DEFAULT_CONFIG: StreamConfig = {
   streamUrl:
     process.env.NEXT_PUBLIC_DEFAULT_STREAM_URL || "http://127.0.0.1:8888",
   frameRate: 30,
-  selectedDeviceId: "",
-  selectedAudioDeviceId: "", // Default value for audio device
+  selectedDeviceId: undefined,
+  selectedAudioDeviceId: undefined,
 };
 
 interface StreamSettingsProps {
@@ -79,7 +82,7 @@ export function StreamSettings({
   if (isDesktop) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader className="text-left">
             <DialogTitle>
               <div className="mt-4">Stream Settings</div>
@@ -136,14 +139,17 @@ function ConfigForm({ config, onSubmit }: ConfigFormProps) {
   const { setOriginalPrompts } = usePrompt();
   const [videoDevices, setVideoDevices] = useState<VideoDevice[]>([]);
   const [audioDevices, setAudioDevices] = useState<VideoDevice[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState<string>("");
-  const [selectedAudioDevice, setSelectedAudioDevice] = useState<string>("");
+  const [selectedDevice, setSelectedDevice] = useState<string | undefined>(config.selectedDeviceId);
+  const [selectedAudioDevice, setSelectedAudioDevice] = useState<string | undefined>(config.selectedDeviceId);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: config,
   });
 
+  /**
+   * Retrieves the list of video devices available on the user's device.
+   */
   const getVideoDevices = useCallback(async () => {
     try {
       await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -200,6 +206,7 @@ function ConfigForm({ config, onSubmit }: ConfigFormProps) {
     }
   }, [selectedAudioDevice]);
 
+  // Handle device change events.
   useEffect(() => {
     getVideoDevices();
     getAudioDevices();
@@ -248,6 +255,16 @@ function ConfigForm({ config, onSubmit }: ConfigFormProps) {
     }
   };
 
+  /**
+   * Handles the camera selection.
+   * @param deviceId
+   */
+  const handleCameraSelect = (deviceId: string) => {
+    if (deviceId !== selectedDevice) {
+      setSelectedDevice(deviceId);
+    }
+  };
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} autoComplete="off">
@@ -281,16 +298,26 @@ function ConfigForm({ config, onSubmit }: ConfigFormProps) {
 
         <div className="mt-4 mb-4">
           <Label>Camera</Label>
-          <Select value={selectedDevice} onValueChange={setSelectedDevice}>
+          <Select
+            required={true}
+            value={selectedDevice}
+            onValueChange={handleCameraSelect}
+          >
             <Select.Trigger className="w-full mt-2">
               {selectedDevice ? (videoDevices.find((d) => d.deviceId === selectedDevice)?.label || "None") : "None"}
             </Select.Trigger>
             <Select.Content>
-              {videoDevices.map((device) => (
-                <Select.Option key={device.deviceId} value={device.deviceId}>
-                  {device.label}
+              {videoDevices.length === 0 ? (
+                <Select.Option disabled value="no-devices">
+                  No camera devices found
                 </Select.Option>
-              ))}
+              ) : (
+                videoDevices.map((device) => (
+                  <Select.Option key={device.deviceId} value={device.deviceId}>
+                    {device.label}
+                  </Select.Option>
+                ))
+              )}
             </Select.Content>
           </Select>
         </div>

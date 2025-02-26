@@ -110,7 +110,9 @@ const InputControl = ({
 export const ControlPanel = ({ panelState, onStateChange }: ControlPanelProps) => {
   const { controlChannel } = usePeerContext();
   const { currentPrompts, setCurrentPrompts } = usePrompt();
-  const [availableNodes, setAvailableNodes] = useState<Record<string, NodeInfo>>({});
+  const [availableNodes, setAvailableNodes] = useState<Record<string, NodeInfo>[]>([{}]);
+  const [promptIdxToUpdate, setPromptIdxToUpdate] = useState<number>(0);
+
   
   // Add ref to track last sent value and timeout
   const lastSentValueRef = React.useRef<{
@@ -152,7 +154,7 @@ export const ControlPanel = ({ panelState, onStateChange }: ControlPanelProps) =
   }, [controlChannel]);
 
   const handleValueChange = (newValue: string) => {
-    const currentInput = panelState.nodeId && panelState.fieldName ? availableNodes[panelState.nodeId]?.inputs[panelState.fieldName] : null;
+    const currentInput = panelState.nodeId && panelState.fieldName ? availableNodes[promptIdxToUpdate][panelState.nodeId]?.inputs[panelState.fieldName] : null;
     
     if (currentInput) {
       // Validate against min/max if they exist for number types
@@ -170,7 +172,7 @@ export const ControlPanel = ({ panelState, onStateChange }: ControlPanelProps) =
 
   // Modify the effect that sends updates with debouncing
   useEffect(() => {
-    const currentInput = panelState.nodeId && panelState.fieldName ? availableNodes[panelState.nodeId]?.inputs[panelState.fieldName] : null;
+    const currentInput = panelState.nodeId && panelState.fieldName ? availableNodes[promptIdxToUpdate][panelState.nodeId]?.inputs[panelState.fieldName] : null;
     if (!currentInput || !currentPrompts) return;
 
     let isValidValue = true;
@@ -218,11 +220,20 @@ export const ControlPanel = ({ panelState, onStateChange }: ControlPanelProps) =
       // Set a new timeout for the update
       updateTimeoutRef.current = setTimeout(() => {
         // Create updated prompt while maintaining current structure
-        const currentPrompt = currentPrompts[0];
-        const updatedPrompt = JSON.parse(JSON.stringify(currentPrompt)); // Deep clone
-        if (updatedPrompt[panelState.nodeId] && updatedPrompt[panelState.nodeId].inputs) {
-          updatedPrompt[panelState.nodeId].inputs[panelState.fieldName] = processedValue;
-          
+        let hasUpdated = false;
+        const updatedPrompts = currentPrompts.map((prompt: any, idx: number) => {
+          if (idx !== promptIdxToUpdate) {
+            return prompt;
+          }
+            const updatedPrompt = JSON.parse(JSON.stringify(prompt)); // Deep clone
+            if (updatedPrompt[panelState.nodeId]?.inputs) {
+            updatedPrompt[panelState.nodeId].inputs[panelState.fieldName] = processedValue;
+            hasUpdated = true;
+          }
+          return updatedPrompt;
+        });
+
+        if (hasUpdated) {
           // Update last sent value
           lastSentValueRef.current = {
             nodeId: panelState.nodeId,
@@ -230,19 +241,19 @@ export const ControlPanel = ({ panelState, onStateChange }: ControlPanelProps) =
             value: processedValue
           };
 
-          // Send the full prompt update
+          // Send the full prompts update
           const message = JSON.stringify({
             type: "update_prompts",
-            prompts: [updatedPrompt]
+            prompts: updatedPrompts
           });
           controlChannel.send(message);
-          
-          // Only update current prompt after sending
-          setCurrentPrompts([updatedPrompt]);
+
+          // Only update prompts after sending
+          setCurrentPrompts(updatedPrompts);
         }
       }, currentInput.type.toLowerCase() === 'number' ? 100 : 300); // Shorter delay for numbers, longer for text
     }
-  }, [panelState.value, panelState.nodeId, panelState.fieldName, panelState.isAutoUpdateEnabled, controlChannel, availableNodes, currentPrompts, setCurrentPrompts]);
+  }, [panelState.value, panelState.nodeId, panelState.fieldName, panelState.isAutoUpdateEnabled, controlChannel, currentPrompts, setCurrentPrompts]);
 
   const toggleAutoUpdate = () => {
     onStateChange({ isAutoUpdateEnabled: !panelState.isAutoUpdateEnabled });
@@ -263,7 +274,7 @@ export const ControlPanel = ({ panelState, onStateChange }: ControlPanelProps) =
   const handleFieldSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedField = e.target.value;
     
-    const input = availableNodes[panelState.nodeId]?.inputs[selectedField];
+    const input = availableNodes[promptIdxToUpdate][panelState.nodeId]?.inputs[selectedField];
     if (input) {
       const initialValue = getInitialValue(input);
       onStateChange({ 
@@ -277,6 +288,13 @@ export const ControlPanel = ({ panelState, onStateChange }: ControlPanelProps) =
 
   return (
     <div className="flex flex-col gap-3 p-3">
+      <select value={promptIdxToUpdate} onChange={(e) => setPromptIdxToUpdate(parseInt(e.target.value))} className="p-2 border rounded">
+        {currentPrompts.map((_: any, idx: number) => (
+          <option key={idx} value={idx}>
+            Prompt {idx}
+          </option>
+        ))}
+      </select>
       <select
         value={panelState.nodeId}
         onChange={(e) => {
@@ -289,7 +307,7 @@ export const ControlPanel = ({ panelState, onStateChange }: ControlPanelProps) =
         className="p-2 border rounded"
       >
         <option value="">Select Node</option>
-        {Object.entries(availableNodes).map(([id, info]) => (
+        {Object.entries(availableNodes[promptIdxToUpdate]).map(([id, info]) => (
           <option key={id} value={id}>
             {id} ({info.class_type})
           </option>
@@ -303,8 +321,8 @@ export const ControlPanel = ({ panelState, onStateChange }: ControlPanelProps) =
         className="p-2 border rounded"
       >
         <option value="">Select Field</option>
-        {panelState.nodeId && availableNodes[panelState.nodeId]?.inputs && 
-          Object.entries(availableNodes[panelState.nodeId].inputs)
+        {panelState.nodeId && availableNodes[promptIdxToUpdate][panelState.nodeId]?.inputs && 
+          Object.entries(availableNodes[promptIdxToUpdate][panelState.nodeId].inputs)
             .filter(([_, info]) => {
               const type = typeof info.type === 'string' ? info.type.toLowerCase() : String(info.type).toLowerCase();
               return ['boolean', 'number', 'float', 'int', 'string'].includes(type) || info.widget === 'combo';
@@ -318,19 +336,19 @@ export const ControlPanel = ({ panelState, onStateChange }: ControlPanelProps) =
       </select>
 
       <div className="flex items-center gap-2">
-        {panelState.nodeId && panelState.fieldName && availableNodes[panelState.nodeId]?.inputs[panelState.fieldName] && (
+        {panelState.nodeId && panelState.fieldName && availableNodes[promptIdxToUpdate][panelState.nodeId]?.inputs[panelState.fieldName] && (
           <InputControl
-            input={availableNodes[panelState.nodeId].inputs[panelState.fieldName]}
+            input={availableNodes[promptIdxToUpdate][panelState.nodeId].inputs[panelState.fieldName]}
             value={panelState.value}
             onChange={handleValueChange}
           />
         )}
         
-        {panelState.nodeId && panelState.fieldName && availableNodes[panelState.nodeId]?.inputs[panelState.fieldName]?.type === 'number' && (
+        {panelState.nodeId && panelState.fieldName && availableNodes[promptIdxToUpdate][panelState.nodeId]?.inputs[panelState.fieldName]?.type === 'number' && (
           <span className="text-sm text-gray-600">
-            {availableNodes[panelState.nodeId]?.inputs[panelState.fieldName]?.min !== undefined && 
-             availableNodes[panelState.nodeId]?.inputs[panelState.fieldName]?.max !== undefined && 
-              `(${availableNodes[panelState.nodeId]?.inputs[panelState.fieldName]?.min} - ${availableNodes[panelState.nodeId]?.inputs[panelState.fieldName]?.max})`
+            {availableNodes[promptIdxToUpdate][panelState.nodeId]?.inputs[panelState.fieldName]?.min !== undefined && 
+             availableNodes[promptIdxToUpdate][panelState.nodeId]?.inputs[panelState.fieldName]?.max !== undefined && 
+              `(${availableNodes[promptIdxToUpdate][panelState.nodeId]?.inputs[panelState.fieldName]?.min} - ${availableNodes[promptIdxToUpdate][panelState.nodeId]?.inputs[panelState.fieldName]?.max})`
             }
           </span>
         )}
@@ -340,7 +358,7 @@ export const ControlPanel = ({ panelState, onStateChange }: ControlPanelProps) =
         onClick={toggleAutoUpdate} 
         disabled={!controlChannel}
         className={`p-2 rounded ${
-          !controlChannel 
+          !controlChannel
             ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
             : panelState.isAutoUpdateEnabled 
               ? 'bg-green-500 text-white'

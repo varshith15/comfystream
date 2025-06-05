@@ -8,6 +8,9 @@ This repo also includes a WebRTC server and UI that uses comfystream to support 
   - [Quick Start](#quick-start)
     - [Docker DevContainer](#docker-devcontainer)
     - [Docker Image](#docker-image)
+      - [RunPod](#runpod)
+      - [Tensordock](#tensordock)
+      - [Other Cloud Providers](#other-cloud-providers)
   - [Download Models](#download-models)
   - [Install package](#install-package)
     - [Custom Nodes](#custom-nodes)
@@ -21,6 +24,7 @@ This repo also includes a WebRTC server and UI that uses comfystream to support 
 ## Quick Start
 
 ### Docker DevContainer
+
 Refer to [.devcontainer/README.md](.devcontainer/README.md) to setup ComfyStream in a devcontainer using a pre-configured ComfyUI docker environment.
 
 For other installation options, refer to [Install ComfyUI and ComfyStream](https://pipelines.livepeer.org/docs/technical/install/local-testing) in the Livepeer pipelines documentation.
@@ -37,9 +41,17 @@ Refer to the documentation at [https://pipelines.livepeer.org/docs/technical/get
 
 The RunPod template [livepeer-comfystream](https://runpod.io/console/deploy?template=w01m180vxx&ref=u8tlskew) can be used to deploy to RunPod.
 
+#### Tensordock
+
+We also have a python script that can be used to spin up a ComfyStream instance on a [Tensordock server](https://tensordock.com/). Refer to [scripts/README.md](./scripts/README.md#tensordock-auto-setup-fully-automated) for instructions.
+
+#### Other Cloud Providers
+
+We also provide an [Ansible playbook](https://docs.ansible.com/ansible/latest/installation_guide/index.html) for deploying ComfyStream on any cloud provider. Refer to [scripts/README.md](./scripts/README.md#cloud-agnostic-automated-setup-ansible-based-deployment) for instructions.
+
 ## Download Models
 
-Refer to [src/comfystream/scripts/README.md](src/comfystream/scripts/README.md) for instructions to download commonly used models.
+Refer to [scripts/README.md](src/comfystream/scripts/README.md) for instructions to download commonly used models.
 
 ## Install package
 
@@ -66,7 +78,7 @@ Make sure you have [PyTorch](https://pytorch.org/get-started/locally/) installed
 Install `comfystream`:
 
 ```bash
-pip install git+https://github.com/yondonfu/comfystream.git
+pip install git+https://github.com/livepeer/comfystream.git
 
 # This can be used to install from a local repo
 # pip install .
@@ -76,9 +88,11 @@ pip install git+https://github.com/yondonfu/comfystream.git
 
 ### Custom Nodes
 
-comfystream uses a few custom nodes to support running workflows.
+Comfystream uses a few auxiliary custom nodes to support running workflows.
 
-Copy the custom nodes into the `custom_nodes` folder of your ComfyUI workspace:
+**Note:** If you are using comfystream as a custom node in ComfyUI, you can skip the following steps.
+
+If you are using comfystream as a standalone application, copy the auxiliary custom nodes into the `custom_nodes` folder of your ComfyUI workspace:
 
 ```bash
 cp -r nodes/* custom_nodes/
@@ -170,6 +184,7 @@ Install dependencies
 ```bash
 cd ui
 npm install --legacy-peer-deps
+npm install --save-dev cross-env
 ```
 
 Run local dev server:
@@ -180,7 +195,7 @@ npm run dev
 
 By default the app will be available at <http://localhost:3000>.
 
-The Stream URL is the URL of the [server](#run-server) which defaults to <http://127.0.0.1:8888>.
+The Stream URL is the URL of the [server](#run-server) which defaults to <http://127.0.0.1:8889>.
 
 > [!NOTE]
 > To run the UI on HTTPS (necessary for webcam functionality), use `npm run dev:https`. You'll need to accept the self-signed certificate in your browser.

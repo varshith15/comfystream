@@ -1,6 +1,7 @@
 /**
  * @file Contains a StreamSettings component for configuring stream settings.
  */
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  Suspense,
   useCallback,
   useEffect,
   useState,
@@ -36,14 +38,19 @@ import {
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Select } from "./ui/select";
+import { Prompt } from "@/types";
 import { toast } from "sonner";
 
 export interface StreamConfig {
   streamUrl: string;
   frameRate: number;
-  prompts?: any;
+  prompts?: Prompt[] | null;
   selectedVideoDeviceId: string;
   selectedAudioDeviceId: string;
+  resolution: {
+    width: number;
+    height: number;
+  };
 }
 
 interface AVDevice {
@@ -53,10 +60,14 @@ interface AVDevice {
 
 export const DEFAULT_CONFIG: StreamConfig = {
   streamUrl:
-    process.env.NEXT_PUBLIC_DEFAULT_STREAM_URL || "http://127.0.0.1:8889",
+    process.env.NEXT_PUBLIC_DEFAULT_STREAM_URL || "http://localhost:8889",
   frameRate: 30,
-  selectedVideoDeviceId: "none",
-  selectedAudioDeviceId: "none",
+  selectedVideoDeviceId: "",
+  selectedAudioDeviceId: "",
+  resolution: {
+    width: 512,
+    height: 512
+  },
 };
 
 interface StreamSettingsProps {
@@ -70,9 +81,34 @@ export function StreamSettings({
   onOpenChange,
   onSave,
 }: StreamSettingsProps) {
-  const isDesktop = useMediaQuery("(min-width: 768px)");
+  return (
+    <Suspense fallback={<div>Loading settings...</div>}>
+      <StreamSettingsInner
+        open={open}
+        onOpenChange={onOpenChange}
+        onSave={onSave}
+      />
+    </Suspense>
+  );
+}
 
-  const [config, setConfig] = useState<StreamConfig>(DEFAULT_CONFIG);
+function StreamSettingsInner({
+  open,
+  onOpenChange,
+  onSave,
+}: StreamSettingsProps) {
+  const isDesktop = useMediaQuery("(min-width: 768px)");
+  const searchParams = useSearchParams();
+
+  const initialConfig: StreamConfig = {
+    ...DEFAULT_CONFIG,
+    streamUrl: searchParams.get("streamUrl") || DEFAULT_CONFIG.streamUrl,
+    frameRate: parseInt(
+      searchParams.get("frameRate") || `${DEFAULT_CONFIG.frameRate}`,
+      10,
+    ),
+  };
+  const [config, setConfig] = useState<StreamConfig>(initialConfig);
 
   const handleSubmit = (config: StreamConfig) => {
     setConfig(config);
@@ -112,6 +148,14 @@ export function StreamSettings({
 const formSchema = z.object({
   streamUrl: z.string().url(),
   frameRate: z.coerce.number(),
+  resolution: z.object({
+    width: z.coerce.number().refine(val => val % 64 === 0 && val >= 64 && val <= 2048, {
+      message: "Width must be a multiple of 64 (between 64 and 2048)"
+    }),
+    height: z.coerce.number().refine(val => val % 64 === 0 && val >= 64 && val <= 2048, {
+      message: "Height must be a multiple of 64 (between 64 and 2048)"
+    })
+  })
 });
 
 interface ConfigFormProps {
@@ -120,28 +164,32 @@ interface ConfigFormProps {
 }
 
 interface PromptContextType {
-  originalPrompts: any;
-  currentPrompts: any;
-  setOriginalPrompts: (prompts: any) => void;
-  setCurrentPrompts: (prompts: any) => void;
+  originalPrompts: Prompt[] | null;
+  currentPrompts: Prompt[] | null;
+  setOriginalPrompts: (prompts: Prompt[]) => void;
+  setCurrentPrompts: (prompts: Prompt[]) => void;
 }
 
 export const PromptContext = createContext<PromptContextType>({
   originalPrompts: null,
   currentPrompts: null,
-  setOriginalPrompts: () => {},
-  setCurrentPrompts: () => {},
+  setOriginalPrompts: () => { },
+  setCurrentPrompts: () => { },
 });
 
 export const usePrompt = () => useContext(PromptContext);
 
 function ConfigForm({ config, onSubmit }: ConfigFormProps) {
-  const [prompts, setPrompts] = useState<any[]>([]);
+  const [prompts, setPrompts] = useState<Prompt[]>([]);
   const { setOriginalPrompts } = usePrompt();
   const [videoDevices, setVideoDevices] = useState<AVDevice[]>([]);
   const [audioDevices, setAudioDevices] = useState<AVDevice[]>([]);
-  const [selectedVideoDevice, setSelectedVideoDevice] = useState<string | undefined>(config.selectedVideoDeviceId);
-  const [selectedAudioDevice, setSelectedAudioDevice] = useState<string | undefined>(config.selectedAudioDeviceId);
+  const [selectedVideoDevice, setSelectedVideoDevice] = useState<
+    string | undefined
+  >(config.selectedVideoDeviceId);
+  const [selectedAudioDevice, setSelectedAudioDevice] = useState<
+    string | undefined
+  >(config.selectedAudioDeviceId);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -159,16 +207,16 @@ function ConfigForm({ config, onSubmit }: ConfigFormProps) {
       const videoDevices = [
         { deviceId: "none", label: "No Video" },
         ...devices
-        .filter((device) => device.kind === "videoinput")
-        .map((device) => ({
-          deviceId: device.deviceId,
-          label: device.label || `Camera ${device.deviceId.slice(0, 5)}...`,
-        }))
+          .filter((device) => device.kind === "videoinput")
+          .map((device) => ({
+            deviceId: device.deviceId,
+            label: device.label || `Camera ${device.deviceId.slice(0, 5)}...`,
+          })),
       ];
 
       setVideoDevices(videoDevices);
-      // Set default to first available camera if no selection yet
-      if (selectedVideoDevice == "none" && videoDevices.length > 1) {
+      // Set first available camera as default if no selection yet.
+      if (selectedVideoDevice == "" && videoDevices.length > 1) {
         setSelectedVideoDevice(videoDevices[1].deviceId); // Index 1 because 0 is "No Video"
       }
     } catch (error) {
@@ -177,7 +225,7 @@ function ConfigForm({ config, onSubmit }: ConfigFormProps) {
         description: "Please make sure your camera is connected and enabled.",
       });
     }
-  }, []);
+  }, [selectedVideoDevice]);
 
   const getAudioDevices = useCallback(async () => {
     try {
@@ -189,22 +237,24 @@ function ConfigForm({ config, onSubmit }: ConfigFormProps) {
           .filter((device) => device.kind === "audioinput")
           .map((device) => ({
             deviceId: device.deviceId,
-            label: device.label || `Microphone ${device.deviceId.slice(0, 5)}...`,
-          }))
+            label:
+              device.label || `Microphone ${device.deviceId.slice(0, 5)}...`,
+          })),
       ];
 
       setAudioDevices(audioDevices);
-      // Set default to first available microphone if no selection yet
-      if (selectedAudioDevice == "none" && audioDevices.length > 1) {
-        setSelectedAudioDevice(audioDevices[0].deviceId);  // Default to "No Audio" due to https://github.com/yondonfu/comfystream/issues/64
+      // Set first available microphone as default if no selection yet.
+      if (selectedAudioDevice == "" && audioDevices.length > 1) {
+        setSelectedAudioDevice(audioDevices[0].deviceId); // Default to "No Audio" due to https://github.com/yondonfu/comfystream/issues/64
       }
     } catch (error) {
       console.error("Failed to get audio devices: ", error);
       toast.error("Failed to get audio devices", {
-        description: "Please make sure your microphone is connected and enabled.",
+        description:
+          "Please make sure your microphone is connected and enabled.",
       });
     }
-  }, []);
+  }, [selectedAudioDevice]);
 
   // Handle device change events.
   useEffect(() => {
@@ -216,11 +266,11 @@ function ConfigForm({ config, onSubmit }: ConfigFormProps) {
     return () => {
       navigator.mediaDevices.removeEventListener(
         "devicechange",
-        getVideoDevices
+        getVideoDevices,
       );
       navigator.mediaDevices.removeEventListener(
         "devicechange",
-        getAudioDevices
+        getAudioDevices,
       );
     };
   }, [getVideoDevices, getAudioDevices]);
@@ -234,10 +284,13 @@ function ConfigForm({ config, onSubmit }: ConfigFormProps) {
       prompts: prompts,
       selectedVideoDeviceId: selectedVideoDevice || "none",
       selectedAudioDeviceId: selectedAudioDevice || "none",
-      });
+      resolution: values.resolution || DEFAULT_CONFIG.resolution,
+    });
   };
 
-  const handlePromptsChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePromptsChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     if (!e.target.files?.length) return;
 
     try {
@@ -260,28 +313,23 @@ function ConfigForm({ config, onSubmit }: ConfigFormProps) {
 
   /**
    * Handles the camera selection.
-   * @param deviceId
+   * @param deviceId - The device ID of the selected camera.
    */
   const handleCameraSelect = (deviceId: string) => {
-    if (deviceId !== selectedVideoDevice) {
+    if (deviceId !== "" && deviceId !== selectedVideoDevice) {
       setSelectedVideoDevice(deviceId);
-      // Unselect audio device when video is selected
-      if (deviceId !== "none") {
-        setSelectedAudioDevice("none");
-      }
     }
   };
 
+  /**
+   * Handles the microphone selection.
+   * @param deviceId - The device ID of the selected microphone.
+   */
   const handleMicrophoneSelect = (deviceId: string) => {
-    if (deviceId !== selectedAudioDevice) {
+    if (deviceId !== "" && deviceId !== selectedAudioDevice) {
       setSelectedAudioDevice(deviceId);
-      // Unselect video device when audio is selected
-      if (deviceId !== "none") {
-        setSelectedVideoDevice("none");
-      }
     }
   };
-
 
   return (
     <Form {...form}>
@@ -314,15 +362,69 @@ function ConfigForm({ config, onSubmit }: ConfigFormProps) {
           )}
         />
 
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="resolution.width"
+            render={({ field }) => (
+              <FormItem className="mt-4">
+                <FormLabel>Width</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min="64"
+                    max="2048"
+                    step="64"
+                    {...field}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value);
+                      field.onChange(value);
+                    }}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="resolution.height"
+            render={({ field }) => (
+              <FormItem className="mt-4">
+                <FormLabel>Height</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min="64"
+                    max="2048"
+                    step="64"
+                    {...field}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value);
+                      field.onChange(value);
+                    }}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
         <div className="mt-4 mb-4">
           <Label>Camera</Label>
+          {/* TODO: Temporary fix to Warn if no camera or mic; improve later */}
           <Select
-            required={true}
-            value={selectedVideoDevice}
+            required={selectedAudioDevice == "none" && selectedVideoDevice == "none" ? true : false}
+            value={selectedVideoDevice == "none" ? "" : selectedVideoDevice}
             onValueChange={handleCameraSelect}
           >
             <Select.Trigger className="w-full mt-2">
-              {selectedVideoDevice ? (videoDevices.find((d) => d.deviceId === selectedVideoDevice)?.label || "None") : "None"}
+              {selectedVideoDevice
+                ? videoDevices.find((d) => d.deviceId === selectedVideoDevice)
+                  ?.label || "None"
+                : "None"}
             </Select.Trigger>
             <Select.Content>
               {videoDevices.length === 0 ? (
@@ -342,23 +444,35 @@ function ConfigForm({ config, onSubmit }: ConfigFormProps) {
 
         <div className="mt-4 mb-4">
           <Label>Microphone</Label>
-          <Select value={selectedAudioDevice} onValueChange={handleMicrophoneSelect}>
+          <Select
+            value={selectedAudioDevice}
+            onValueChange={handleMicrophoneSelect}
+          >
             <Select.Trigger className="w-full mt-2">
-              {selectedAudioDevice ? (audioDevices.find((d) => d.deviceId === selectedAudioDevice)?.label || "None") : "None"}
+              {selectedAudioDevice
+                ? audioDevices.find((d) => d.deviceId === selectedAudioDevice)
+                  ?.label || "None"
+                : "None"}
             </Select.Trigger>
             <Select.Content>
-            {audioDevices.length === 0 ? (
+              {audioDevices.length === 0 ? (
                 <Select.Option disabled value="no-devices">
                   No audio devices found
                 </Select.Option>
               ) : (
                 audioDevices
-                .filter((device) => device.deviceId !== undefined && device.deviceId != "")
-                .map((device) => (
-                  <Select.Option key={device.deviceId} value={device.deviceId}>
-                    {device.label}
-                  </Select.Option>
-                ))
+                  .filter(
+                    (device) =>
+                      device.deviceId !== undefined && device.deviceId != "",
+                  )
+                  .map((device) => (
+                    <Select.Option
+                      key={device.deviceId}
+                      value={device.deviceId}
+                    >
+                      {device.label}
+                    </Select.Option>
+                  ))
               )}
             </Select.Content>
           </Select>

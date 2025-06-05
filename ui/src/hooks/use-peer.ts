@@ -1,6 +1,7 @@
 import { Peer } from "@/lib/peer";
 import { PeerProps } from "@/components/peer";
-import * as React from "react";
+import { OfferResponse } from "@/types";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 const MAX_OFFER_RETRIES = 5;
 const OFFER_RETRY_INTERVAL = 500;
@@ -10,62 +11,67 @@ export function usePeer(props: PeerProps): Peer {
     props;
 
   const [peerConnection, setPeerConnection] =
-    React.useState<RTCPeerConnection | null>(null);
-  const [remoteStream, setRemoteStream] = React.useState<MediaStream | null>(
-    null
+    useState<RTCPeerConnection | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [controlChannel, setControlChannel] = useState<RTCDataChannel | null>(
+    null,
   );
-  const [controlChannel, setControlChannel] = React.useState<RTCDataChannel | null>(null);
 
-  const connectionStateTimeoutRef = React.useRef(null);
+  const connectionStateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const sendOffer = async (
-    url: string,
-    offer: RTCSessionDescriptionInit | RTCSessionDescription,
-    retry: number = 0
-  ): Promise<any> => {
-    try {
-      const response = await fetch("/api/offer", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          endpoint: url,
-          prompts: prompts,
-          offer,
-        }),
-      });
+  const sendOffer = useCallback(
+    async (
+      url: string,
+      offer: RTCSessionDescriptionInit | RTCSessionDescription,
+      retry: number = 0,
+    ): Promise<OfferResponse> => {
+      try {
+        const response = await fetch("/api/offer", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            endpoint: url,
+            prompts: prompts,
+            offer,
+          }),
+        });
 
-      if (!response.ok) {
-        throw new Error(`offer HTTP error: ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`offer HTTP error: ${response.status}`);
+        }
+        return (await response.json()) as OfferResponse;
+      } catch (error) {
+        if (retry < MAX_OFFER_RETRIES) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, OFFER_RETRY_INTERVAL),
+          );
+          return sendOffer(url, offer, retry + 1);
+        }
+        throw error;
       }
+    },
+    [prompts],
+  );
 
-      return await response.json();
-    } catch (error) {
-      if (retry < MAX_OFFER_RETRIES) {
-        await new Promise((resolve) =>
-          setTimeout(resolve, OFFER_RETRY_INTERVAL)
-        );
-        return sendOffer(url, offer, retry + 1);
+  const handleConnectionStateChange = useCallback(
+    (state: string) => {
+      switch (state) {
+        case "connected":
+          onConnected();
+          break;
+        case "disconnected":
+          onDisconnected();
+          break;
+        default:
+          break;
       }
-      throw error;
-    }
-  };
+    },
+    [onConnected, onDisconnected],
+  );
 
-  const handleConnectionStateChange = (state: string) => {
-    switch (state) {
-      case "connected":
-        onConnected();
-        break;
-      case "disconnected":
-        onDisconnected();
-        break;
-      default:
-        break;
-    }
-  };
-
-  React.useEffect(() => {
+  useEffect(() => {
     if (connect) {
       if (peerConnection) return;
       if (!localStream) return;
@@ -91,10 +97,28 @@ export function usePeer(props: PeerProps): Peer {
 
       // Create control channel for both negotiation and control
       const channel = pc.createDataChannel("control");
-      
+
       channel.onopen = () => {
-        console.log("[usePeer] Control channel opened, readyState:", channel.readyState);
+        console.log(
+          "[usePeer] Control channel opened, readyState:",
+          channel.readyState,
+        );
         setControlChannel(channel);
+        
+        // Send resolution configuration to server if available
+        if (props.resolution) {
+          // Add a small delay to ensure the channel is fully established
+          setTimeout(() => {
+            const resolution = props.resolution!;
+            const resolutionMessage = {
+              type: "update_resolution",
+              width: resolution.width,
+              height: resolution.height
+            };
+            channel.send(JSON.stringify(resolutionMessage));
+            console.log("[usePeer] Sent resolution configuration:", resolutionMessage);
+          }, 200);
+        }
       };
 
       channel.onclose = () => {
@@ -118,12 +142,16 @@ export function usePeer(props: PeerProps): Peer {
 
       pc.onicecandidate = async (event) => {
         if (!event.candidate) {
-          const answer = await sendOffer(url, pc.localDescription!);
+          const offerResponse = await sendOffer(url, pc.localDescription!);
+          const answer: RTCSessionDescriptionInit = {
+            sdp: offerResponse.sdp,
+            type: offerResponse.type as RTCSdpType,
+          };
           await pc.setRemoteDescription(answer);
         }
       };
 
-      pc.onconnectionstatechange = (event) => {
+      pc.onconnectionstatechange = () => {
         handleConnectionStateChange(pc.connectionState);
       };
 
@@ -144,7 +172,29 @@ export function usePeer(props: PeerProps): Peer {
       setRemoteStream(null);
       setPeerConnection(null);
     }
-  }, [connect, localStream]);
+  }, [
+    connect,
+    localStream,
+    peerConnection,
+    sendOffer,
+    url,
+    handleConnectionStateChange,
+    props.resolution,
+  ]);
+
+  // Update resolution when it changes
+  useEffect(() => {
+    if (controlChannel && controlChannel.readyState === 'open' && props.resolution) {
+      const resolution = props.resolution;
+      const resolutionMessage = {
+        type: "update_resolution",
+        width: resolution.width,
+        height: resolution.height
+      };
+      controlChannel.send(JSON.stringify(resolutionMessage));
+      console.log("[usePeer] Updated resolution configuration:", resolutionMessage);
+    }
+  }, [controlChannel, props.resolution]);
 
   return {
     peerConnection,

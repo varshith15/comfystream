@@ -16,9 +16,9 @@
             },
             "args": [
                 "--listen",
-                "--disable-cuda-malloc",
+                "--disable-cuda-malloc"
             ],
-            "python": "/workspace/miniconda3/envs/comfyui/bin/python"
+            "python": "/workspace/miniconda3/envs/comfystream/bin/python"
         },
         {
             "name": "Run ComfyStream",
@@ -44,7 +44,7 @@
             "runtimeExecutable": "npm",
             "runtimeArgs": [
                 "run",
-                "dev"
+                "dev:https"
             ],
             "serverReadyAction": {
                 "pattern": "listening on",

@@ -4,21 +4,34 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "comfystream"
-version = "0.0.2"
+description = "Build Live AI Video with ComfyUI"
+version = "0.1.1"
+license = { file = "LICENSE" }
 dependencies = [
     "asyncio",
     "comfyui @ git+https://github.com/hiddenswitch/ComfyUI.git@ce3583ad42c024b8f060d0002cbe20c265da6dc8",
+    "aiortc",
+    "aiohttp",
+    "toml",
+    "twilio",
+    "prometheus_client",
+    "librosa"
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "pytest-cov"]
 
 [project.urls]
-Homepage = "https://github.com/yondonfu/comfystream"
+repository = "https://github.com/yondonfu/comfystream"
+
+[tool.comfy]
+PublisherId = "livepeer-comfystream"
+DisplayName = "ComfyStream"
+Icon = "https://raw.githubusercontent.com/livepeer/comfystream-docs/main/logo/icon-light-120px.svg" # SVG, PNG, JPG or GIF (MAX. 800x400px)
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-packages = {find = {where = ["src"]}}
+packages = {find = {where = ["src", "nodes"]}}
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}

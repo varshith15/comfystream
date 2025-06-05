@@ -1,0 +1,11 @@
+# TensorDock Spinup
+requests
+geopy
+colorama
+qrcode_terminal
+click
+bcrypt
+rich
+# Profiler
+psutil
+pynvml
